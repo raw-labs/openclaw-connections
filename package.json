@@ -1,5 +1,5 @@
 {
-  "name": "openclaw-connections",
+  "name": "@raw-labs/openclaw-connections",
   "version": "0.1.0",
   "description": "Native OpenClaw Connections UI and agent tools, using your own Composio project.",
   "type": "module",
@@ -64,5 +64,12 @@
       "pluginSdkVersion": "2026.9.4"
     },
     "controlUi": "./src/control-ui.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/raw-labs/openclaw-connections.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   }
 }
