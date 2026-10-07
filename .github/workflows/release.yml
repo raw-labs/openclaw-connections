@@ -86,18 +86,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           NODE_AUTH_TOKEN: ${{ github.token }}
         run: |
-          # Package metadata can lag the successful registry publication.
-          for attempt in 1 2 3; do
-            gh api "orgs/${GITHUB_REPOSITORY_OWNER}/packages/npm/openclaw-connections" > .local/package-metadata.json
-            jq '{visibility, repository: .repository.full_name}' .local/package-metadata.json
-            if jq --exit-status --arg repository "$GITHUB_REPOSITORY" \
-              '.visibility == "private" and .repository.full_name == $repository' .local/package-metadata.json; then
-              break
-            fi
-            if [ "$attempt" = 3 ]; then exit 1; fi
-            sleep 5
-          done
+          gh api "orgs/${GITHUB_REPOSITORY_OWNER}/packages/npm/openclaw-connections" |
+          jq --exit-status '.visibility == "private"'
           version=$(node -p 'require("./package.json").version')
+          # The npm source link comes from registry package metadata, not the
+          # optional repository object in GitHub's generic Packages response.
+          npm view "@raw-labs/openclaw-connections@$version" repository.url --json > .local/published-repository.json
+          node -e 'const url = require("./.local/published-repository.json"); if (typeof url !== "string" || url.replace(/^git\+/, "").replace(/\.git$/, "") !== `https://github.com/${process.env.GITHUB_REPOSITORY}`) process.exit(1)'
           mkdir -p .local/registry
           npm pack "@raw-labs/openclaw-connections@$version" --pack-destination .local/registry
           cmp .local/*.tgz .local/registry/*.tgz
