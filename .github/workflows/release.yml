@@ -43,7 +43,7 @@ jobs:
           done
   publish:
     needs: release
-    if: always() && (needs.release.outputs.created == 'true' || inputs.tag != '')
+    if: ${{ !cancelled() && (needs.release.outputs.created == 'true' || inputs.tag != '') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
