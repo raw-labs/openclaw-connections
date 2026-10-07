@@ -3,6 +3,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to finish publishing; leave empty for Release Please
+        type: string
+        required: false
 permissions:
   contents: read
 concurrency:
@@ -10,6 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
+    if: inputs.tag == ''
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -37,7 +43,7 @@ jobs:
           done
   publish:
     needs: release
-    if: needs.release.outputs.created == 'true'
+    if: ${{ !cancelled() && (needs.release.outputs.created == 'true' || inputs.tag != '') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -46,7 +52,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
-          ref: ${{ needs.release.outputs.tag }}
+          ref: ${{ inputs.tag || needs.release.outputs.tag }}
       - uses: ./.github/actions/setup
       - run: pnpm check
       - run: pnpm build
@@ -55,7 +61,7 @@ jobs:
       - run: git diff --exit-code
       - name: Verify release version
         env:
-          RELEASE_TAG: ${{ needs.release.outputs.tag }}
+          RELEASE_TAG: ${{ inputs.tag || needs.release.outputs.tag }}
         run: node -e 'if (process.env.RELEASE_TAG !== `v${require("./package.json").version}`) process.exit(1)'
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -63,7 +69,16 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: "@raw-labs"
       - name: Publish verified tarball
-        run: npm publish .local/*.tgz
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          mkdir -p .local/registry
+          if npm pack "@raw-labs/openclaw-connections@$version" --json --pack-destination .local/registry > .local/registry-result.json; then
+            cmp .local/*.tgz .local/registry/*.tgz
+          else
+            # Only a structured not-found response authorizes first publication.
+            node -e 'if (require("./.local/registry-result.json").error?.code !== "E404") process.exit(1)'
+            npm publish .local/*.tgz
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ github.token }}
       - name: Verify private package and registry artifact
@@ -72,14 +87,28 @@ jobs:
           NODE_AUTH_TOKEN: ${{ github.token }}
         run: |
           gh api "orgs/${GITHUB_REPOSITORY_OWNER}/packages/npm/openclaw-connections" |
-          jq --exit-status --arg repository "$GITHUB_REPOSITORY" \
-            '.visibility == "private" and .repository.full_name == $repository'
+          jq --exit-status '.visibility == "private"'
           version=$(node -p 'require("./package.json").version')
+          # The npm source link comes from registry package metadata, not the
+          # optional repository object in GitHub's generic Packages response.
+          npm view "@raw-labs/openclaw-connections@$version" repository.url --json > .local/published-repository.json
+          node -e 'const url = require("./.local/published-repository.json"); if (typeof url !== "string" || url.replace(/^git\+/, "").replace(/\.git$/, "") !== `https://github.com/${process.env.GITHUB_REPOSITORY}`) process.exit(1)'
           mkdir -p .local/registry
           npm pack "@raw-labs/openclaw-connections@$version" --pack-destination .local/registry
           cmp .local/*.tgz .local/registry/*.tgz
       - name: Attach installable release artifact
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ needs.release.outputs.tag }}
-        run: gh release upload "$RELEASE_TAG" .local/*.tgz
+          RELEASE_TAG: ${{ inputs.tag || needs.release.outputs.tag }}
+        run: |
+          archives=(.local/*.tgz)
+          archive=${archives[0]}
+          name=$(basename "$archive")
+          gh release view "$RELEASE_TAG" --json assets > .local/release-assets.json
+          if node -e 'if (!require("./.local/release-assets.json").assets.some(asset => asset.name === process.argv[1])) process.exit(1)' "$name"; then
+            mkdir -p .local/release
+            gh release download "$RELEASE_TAG" --pattern "$name" --dir .local/release
+            cmp "$archive" ".local/release/$name"
+          else
+            gh release upload "$RELEASE_TAG" "$archive"
+          fi
