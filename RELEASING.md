@@ -22,9 +22,12 @@ repository link, compares a registry download with the tarball, and attaches it 
 Publication uses the workflow's `GITHUB_TOKEN` with `packages: write`; no long-lived
 publishing credential belongs in the repository.
 
-A failed publication leaves the tag/Release intact; check the workflow and registry
-before rerunning the failed publish job. Never delete or reuse an already-published
-version. Fix a published defect with a new version. GitHub Actions run artifacts also
+A failed publication leaves the tag/Release intact. Dispatch the Release workflow
+with its existing `tag` to finish publication using the current workflow and the
+tagged source. An existing registry version must match the verified tarball byte for
+byte before publication is skipped; a mismatch fails. Leave `tag` empty for normal
+Release Please runs. Never delete or reuse an already-published version. Fix a
+published defect with a new version. GitHub Actions run artifacts also
 contain the verified tarball, but are not versioned releases.
 
 ## Consuming the private package

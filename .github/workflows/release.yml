@@ -3,6 +3,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to finish publishing; leave empty for Release Please
+        type: string
+        required: false
 permissions:
   contents: read
 concurrency:
@@ -10,6 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
+    if: inputs.tag == ''
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -37,7 +43,7 @@ jobs:
           done
   publish:
     needs: release
-    if: needs.release.outputs.created == 'true'
+    if: always() && (needs.release.outputs.created == 'true' || inputs.tag != '')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -46,7 +52,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
-          ref: ${{ needs.release.outputs.tag }}
+          ref: ${{ inputs.tag || needs.release.outputs.tag }}
       - uses: ./.github/actions/setup
       - run: pnpm check
       - run: pnpm build
@@ -55,7 +61,7 @@ jobs:
       - run: git diff --exit-code
       - name: Verify release version
         env:
-          RELEASE_TAG: ${{ needs.release.outputs.tag }}
+          RELEASE_TAG: ${{ inputs.tag || needs.release.outputs.tag }}
         run: node -e 'if (process.env.RELEASE_TAG !== `v${require("./package.json").version}`) process.exit(1)'
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -63,7 +69,16 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: "@raw-labs"
       - name: Publish verified tarball
-        run: npm publish .local/*.tgz
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          mkdir -p .local/registry
+          if npm pack "@raw-labs/openclaw-connections@$version" --json --pack-destination .local/registry > .local/registry-result.json; then
+            cmp .local/*.tgz .local/registry/*.tgz
+          else
+            # Only a structured not-found response authorizes first publication.
+            node -e 'if (require("./.local/registry-result.json").error?.code !== "E404") process.exit(1)'
+            npm publish .local/*.tgz
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ github.token }}
       - name: Verify private package and registry artifact
@@ -71,9 +86,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           NODE_AUTH_TOKEN: ${{ github.token }}
         run: |
-          gh api "orgs/${GITHUB_REPOSITORY_OWNER}/packages/npm/openclaw-connections" |
-          jq --exit-status --arg repository "$GITHUB_REPOSITORY" \
-            '.visibility == "private" and .repository.full_name == $repository'
+          # Package metadata can lag the successful registry publication.
+          for attempt in 1 2 3; do
+            gh api "orgs/${GITHUB_REPOSITORY_OWNER}/packages/npm/openclaw-connections" > .local/package-metadata.json
+            jq '{visibility, repository: .repository.full_name}' .local/package-metadata.json
+            if jq --exit-status --arg repository "$GITHUB_REPOSITORY" \
+              '.visibility == "private" and .repository.full_name == $repository' .local/package-metadata.json; then
+              break
+            fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            sleep 5
+          done
           version=$(node -p 'require("./package.json").version')
           mkdir -p .local/registry
           npm pack "@raw-labs/openclaw-connections@$version" --pack-destination .local/registry
@@ -81,5 +104,5 @@ jobs:
       - name: Attach installable release artifact
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ needs.release.outputs.tag }}
-        run: gh release upload "$RELEASE_TAG" .local/*.tgz
+          RELEASE_TAG: ${{ inputs.tag || needs.release.outputs.tag }}
+        run: gh release upload "$RELEASE_TAG" .local/*.tgz --clobber
