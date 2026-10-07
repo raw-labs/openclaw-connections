@@ -22,7 +22,7 @@
     ".": "./dist/index.js"
   },
   "peerDependencies": {
-    "openclaw": "2026.9.4"
+    "openclaw": "2026.9.8"
   },
   "peerDependenciesMeta": {
     "openclaw": {
@@ -34,14 +34,16 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "openclaw": "2026.9.4",
-    "typescript": "6.0.3",
+    "@openclaw/codex": "2026.9.8",
+    "@types/jsdom": "21.1.7",
     "@types/node": "24.10.13",
-    "tsx": "4.23.13",
     "esbuild": "0.27.4",
-    "prettier": "3.9.7",
     "jsdom": "26.1.0",
-    "@types/jsdom": "21.1.7"
+    "openclaw": "2026.9.8",
+    "playwright": "1.63.0",
+    "prettier": "3.9.7",
+    "tsx": "4.23.13",
+    "typescript": "6.0.3"
   },
   "scripts": {
     "check": "prettier --check . && tsc --noEmit && pnpm test",
@@ -49,19 +51,20 @@
     "build": "node scripts/build.mjs",
     "format": "prettier --write .",
     "artifact": "pnpm build && npm pack --pack-destination .local",
-    "test:native": "pnpm build && node --import tsx --test tests/native/*.test.ts"
+    "test:native": "node --import tsx --test tests/native/*.test.ts",
+    "inspect:package": "node scripts/inspect-package.mjs"
   },
   "openclaw": {
     "extensions": [
       "./dist/index.js"
     ],
     "compat": {
-      "pluginApi": "2026.9.4",
-      "minGatewayVersion": "2026.9.4"
+      "pluginApi": "2026.9.8",
+      "minGatewayVersion": "2026.9.8"
     },
     "build": {
-      "openclawVersion": "2026.9.4",
-      "pluginSdkVersion": "2026.9.4"
+      "openclawVersion": "2026.9.8",
+      "pluginSdkVersion": "2026.9.8"
     },
     "controlUi": "./src/control-ui.ts"
   },

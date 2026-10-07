@@ -17,8 +17,12 @@
 - Keep provider I/O in its adapter, SQL in the local store and lifetimes in plugin wiring.
   Use strict TypeScript, runtime boundary validation and parameterized SQL. No `any`,
   unsafe casts, blanket suppressions or sibling-repository runtime imports.
-- README.md owns installation, configuration and actual limits. Keep it accurate in
+- README.md owns installation, configuration and actual limits; RELEASING.md owns
+  versioning, workflows and private package access. Keep it accurate in
   the same change. Preserve licenses and revisions in THIRD_PARTY_NOTICES.md.
 - Review changed files. Run `pnpm check`, `pnpm build` and relevant native/browser
   verification before delivery. State what was not tested. Clean disposable fixtures.
+- Keep SDK versions, lockfile and compatibility declarations aligned. Package versions
+  come from package.json; inspect the packed artifact before release. Preserve private
+  visibility and use workflow tokens for publishing.
 - Work only on the requested slice. Preserve unrelated work; push only when authorized.

@@ -1,0 +1,59 @@
+import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
+import { readFile, mkdir } from "node:fs/promises";
+import { promisify } from "node:util";
+const execute = promisify(execFile);
+const pkg = JSON.parse(await readFile("package.json", "utf8"));
+const manifest = JSON.parse(await readFile("openclaw.plugin.json", "utf8"));
+assert.equal(pkg.name, "@raw-labs/openclaw-connections");
+assert.equal(manifest.id, "openclaw-connections");
+assert.equal(manifest.version, pkg.version);
+assert.equal(pkg.peerDependencies.openclaw, pkg.devDependencies.openclaw);
+assert.equal(
+  pkg.openclaw.compat.minGatewayVersion,
+  pkg.devDependencies.openclaw,
+);
+assert.equal(pkg.openclaw.build.pluginSdkVersion, pkg.devDependencies.openclaw);
+assert.equal(pkg.publishConfig.registry, "https://npm.pkg.github.com");
+assert.notEqual(pkg.private, true);
+await mkdir(".local", { recursive: true });
+const packs = JSON.parse(
+  (await execute("npm", ["pack", "--json", "--pack-destination", ".local"]))
+    .stdout,
+);
+assert.equal(packs.length, 1);
+const pack = packs[0];
+for (const file of pack.files) {
+  assert.match(
+    file.path,
+    /^(?:dist\/|assets\/|skills\/|package\.json$|openclaw\.plugin\.json$|README\.md$|LICENSE$|NOTICE$|THIRD_PARTY_NOTICES\.md$)/,
+  );
+  assert.doesNotMatch(
+    file.path,
+    /(?:^|\/)(?:node_modules|\.env|\.local|tests|src|state)(?:\/|$)/,
+  );
+}
+for (const path of [
+  "dist/index.js",
+  "assets/catalog.json",
+  "skills/connections/SKILL.md",
+  "LICENSE",
+  "NOTICE",
+  "THIRD_PARTY_NOTICES.md",
+  "dist/licenses/zod.txt",
+  "dist/licenses/typebox.txt",
+]) {
+  assert.ok(
+    pack.files.some((file) => file.path === path),
+    `Missing ${path}`,
+  );
+}
+assert.ok(
+  pack.files.some(
+    (file) =>
+      file.path.startsWith("dist/control-ui/") && file.path.endsWith(".js"),
+  ),
+);
+process.stdout.write(
+  `Verified ${pack.filename}: ${pack.files.length} files, ${pack.shasum}\n`,
+);

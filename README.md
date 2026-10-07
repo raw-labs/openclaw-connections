@@ -3,6 +3,9 @@
 A standalone native OpenClaw plugin with a Connections page and three agent tools:
 `connections_search`, `connections_describe` and `connections_call`.
 
+The existing OpenClaw Codex harness can expose these tools through its dynamic-tool
+bridge when native tool policy allows them; no separate MCP adapter is required.
+
 Use your own Composio project. No ClawScarf Cloud account, WorkOS login, separate web
 server or PostgreSQL database is required. OpenClaw owns authentication, administrator
 roles, agents and tool policy. Composio hosts provider authentication and execution.
@@ -15,17 +18,20 @@ when needed; execution uses the exact described version and account generation.
 
 ## Install and configure
 
-Requires Node `24.16+` within Node 24, or `26.1+`, and OpenClaw `2026.9.4`, the pinned SDK
+Requires Node `24.16+` within Node 24, or `26.1+`, and OpenClaw `2026.9.8`, the pinned SDK
 target. Other OpenClaw versions need compatibility verification before use.
-This initial package is built locally; it is not published to npm.
+The package name is `@raw-labs/openclaw-connections`, prepared for private distribution through
+GitHub Packages. The first publication is pending the storage compatibility decision.
+See [releases and private package access](RELEASING.md).
 
 ```sh
 pnpm install --frozen-lockfile
+pnpm exec playwright install chromium
 pnpm check
 pnpm build
 pnpm test:native
 pnpm artifact
-openclaw plugins install npm-pack:/absolute/path/to/openclaw-connections/.local/openclaw-connections-0.1.0.tgz --force --accept-capabilities
+openclaw plugins install npm-pack:/absolute/path/to/openclaw-connections/.local/raw-labs-openclaw-connections-0.1.0.tgz --force --accept-capabilities
 ```
 
 Review the package before accepting its native plugin capabilities. Configure
@@ -105,7 +111,8 @@ lookup and paged results use the same `connections_call` tool. See the bundled
 
 ## State and trust
 
-State lives at `<OpenClaw state directory>/connections/connections.sqlite`, created
+The storage compatibility decision is deferred. Current state lives at
+`<OpenClaw state directory>/connections/connections.sqlite`, created
 with owner-only permissions. It stores account references, names, grants, pending setup
 links/ticket hashes and call receipts/results; it never stores the Composio project key
 or service OAuth tokens. A single Gateway owns this state directory. Back it up as
@@ -134,11 +141,21 @@ of uncertain mutations in this plugin.
 `pnpm check` checks formatting, strict TypeScript and regressions. `pnpm build` bundles
 runtime dependencies, their licenses and the native Control UI using OpenClaw's plugin
 builder. `pnpm artifact` produces the installable tarball under ignored `.local/`.
-`pnpm test:native` builds and installs the package in temporary vanilla OpenClaw state,
-exercising Gateway startup, RPC, tools, restart and disablement. The plugin has no
+`pnpm test:native` installs the already-built package in temporary vanilla OpenClaw
+state, exercising Gateway startup, administrator RPC, the official Codex dynamic-tool
+bridge, duplicate-call recovery, restart and disablement. Chromium loads the packed
+UI asset served by the Gateway through a small public-SDK host fixture with real
+native RPC; this checks rendering on desktop and mobile, without automating the full
+OpenClaw shell or its plugin consent flow. The plugin has no
 runtime dependency on either donor repository. See
 [AGENTS.md](AGENTS.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
 
+`pnpm inspect:package` validates version alignment and the contents of the installable
+tarball. GitHub Actions runs these checks with Node 24.19.0 and the locked dependencies
+on PRs, main and explicit dispatches. See [the release guide](RELEASING.md) for versions,
+publishing and private consumers.
+
 Automated tests use controlled Composio responses and temporary OpenClaw state. They
-do not establish real external OAuth consent or provider execution. Live verification
+do not establish real external OAuth consent, provider execution or a live Codex
+app-server conversation. Those checks remain for the internal pilot. Live verification
 needs a dedicated Composio project and explicitly authorized test accounts/actions.

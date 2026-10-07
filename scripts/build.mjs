@@ -27,10 +27,11 @@ for (const [dependency, filename] of [
     `dist/licenses/${dependency}.txt`,
   );
 }
+const packageInfo = JSON.parse(await readFile("package.json", "utf8"));
 const manifest = {
   id: "openclaw-connections",
   name: "Connections",
-  version: "0.1.0",
+  version: packageInfo.version,
   description: "Connect your services through your own Composio project.",
   skills: ["./skills"],
   activation: { onStartup: true },
