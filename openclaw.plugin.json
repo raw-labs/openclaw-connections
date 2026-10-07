@@ -1,0 +1,70 @@
+{
+  "id": "openclaw-connections",
+  "name": "Connections",
+  "version": "0.1.0",
+  "description": "Connect your services through your own Composio project.",
+  "skills": ["./skills"],
+  "activation": { "onStartup": true },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "apiKey": {
+        "anyOf": [
+          { "type": "string", "minLength": 1 },
+          {
+            "type": "object",
+            "required": ["source", "provider", "id"],
+            "properties": {
+              "source": {
+                "anyOf": [
+                  { "type": "string", "const": "env" },
+                  { "type": "string", "const": "file" },
+                  { "type": "string", "const": "exec" }
+                ]
+              },
+              "provider": { "type": "string", "minLength": 1 },
+              "id": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "userId": { "type": "string", "minLength": 1, "maxLength": 256 },
+      "authConfigIds": {
+        "type": "object",
+        "patternProperties": {
+          "^.*$": { "type": "string", "minLength": 1, "maxLength": 256 }
+        }
+      }
+    },
+    "additionalProperties": false
+  },
+  "configContracts": {
+    "secretInputs": {
+      "paths": [
+        { "path": "apiKey", "expected": "string", "ownerKind": "capability" }
+      ]
+    }
+  },
+  "uiHints": {
+    "apiKey": {
+      "label": "Composio API key",
+      "sensitive": true,
+      "help": "Use a native secret reference. This key stays in the Gateway."
+    },
+    "userId": {
+      "label": "Composio user ID",
+      "help": "Optional. A stable installation identity is created when omitted."
+    },
+    "authConfigIds": {
+      "label": "Auth configuration IDs",
+      "help": "Optional map from service ID to an existing Composio auth config ID."
+    }
+  },
+  "contracts": {
+    "tools": ["connections_search", "connections_describe", "connections_call"]
+  },
+  "controlUi": {
+    "entry": "dist/control-ui/3e3c9aae3c4cd2c9af62303b1f675658cc4e0faaf518e0167e5583e75ad43132/index.js"
+  }
+}
