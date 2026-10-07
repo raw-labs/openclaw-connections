@@ -50,6 +50,7 @@ await test(
     await mkdir(home);
     await mkdir(state);
     let gateway: ChildProcess | undefined;
+    let packedDirectory: string | undefined;
     let diagnostics = "";
     const native = (...args: string[]) =>
       execute(process.execPath, [runtime, ...args], {
@@ -130,6 +131,9 @@ await test(
       const archive = packed[0];
       assert.ok(archive);
       const path = join(directory, archive.filename);
+      await mkdir(join(root, ".local"), { recursive: true });
+      packedDirectory = await mkdtemp(join(root, ".local/native-packed-"));
+      await execute("tar", ["-xzf", path, "-C", packedDirectory]);
       const listing = (await execute("tar", ["-tzf", path])).stdout;
       assert.match(listing, /package\/dist\/control-ui\//);
       assert.match(listing, /package\/assets\/catalog.json/);
@@ -294,22 +298,6 @@ await test(
             ticket: setup.ticket,
           }),
         );
-        const bridged = await execute(
-          process.execPath,
-          [
-            join(root, "tests/native/codex-bridge.mjs"),
-            `http://127.0.0.1:${port}`,
-            token,
-            connected.id,
-            String(connected.generation),
-          ],
-          { cwd: root, env, maxBuffer: 4 * 1024 * 1024 },
-        );
-        assert.match(bridged.stdout, /All three tools passed/);
-        assert.equal(
-          await readFile(env.CONNECTIONS_TEST_EXECUTIONS, "utf8"),
-          "executed\n",
-        );
         const catalog = z
           .object({
             plugins: z.array(
@@ -359,6 +347,26 @@ await test(
         } finally {
           await browser.close();
         }
+        // A single process owns SQLite: stop the Gateway before the SDK fixture
+        // opens the retained database, then restart for the retained-result checks.
+        await stop();
+        const bridged = await execute(
+          process.execPath,
+          [
+            "--import",
+            join(root, "tests/native/composio-fixture.mjs"),
+            join(root, "tests/native/codex-bridge.mjs"),
+            join(packedDirectory, "package/dist/index.js"),
+            connected.id,
+            String(connected.generation),
+          ],
+          { cwd: root, env, maxBuffer: 4 * 1024 * 1024 },
+        );
+        assert.match(bridged.stdout, /All three tools passed/);
+        assert.equal(
+          await readFile(env.CONNECTIONS_TEST_EXECUTIONS, "utf8"),
+          "executed\n",
+        );
       } finally {
         admin.stop();
       }
@@ -413,7 +421,7 @@ await test(
           tool: "connections_call",
           args: {
             mode: "lookup",
-            toolCallId: "http-direct-operator-codex-call",
+            toolCallId: "codex-call",
           },
           agentId: "main",
           sessionKey: "agent:main:connections-test",
@@ -451,7 +459,7 @@ await test(
             tool: "connections_call",
             args: {
               mode: "lookup",
-              toolCallId: "http-direct-operator-codex-call",
+              toolCallId: "codex-call",
             },
             agentId: "main",
             sessionKey: "agent:main:connections-test",
@@ -484,6 +492,8 @@ await test(
       assert.equal(disabled.status, 404);
     } finally {
       await stop();
+      if (packedDirectory)
+        await rm(packedDirectory, { recursive: true, force: true });
       await rm(directory, { recursive: true, force: true });
     }
   },

@@ -2,7 +2,6 @@ import { build } from "esbuild";
 import { mkdir, readFile, writeFile, rm, copyFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { format } from "prettier";
 import { configSchema } from "../src/config.ts";
 
 await rm("dist", { recursive: true, force: true });
@@ -80,7 +79,7 @@ if (
   throw Error("Native plugin build did not produce UI and tool metadata.");
 await writeFile(
   "openclaw.plugin.json",
-  await format(JSON.stringify(generated), { parser: "json" }),
+  `${JSON.stringify(generated, null, 2)}\n`,
 );
 process.stdout.write(
   "Built native Connections plugin, tools and Control UI.\n",

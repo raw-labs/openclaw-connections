@@ -31,7 +31,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh pr list --label autorelease:pending --json headRefName --jq '.[].headRefName' |
+          gh pr list --label 'autorelease: pending' --json headRefName --jq '.[].headRefName' |
           while IFS= read -r branch; do
             gh workflow run ci.yml --ref "$branch"
           done
@@ -66,6 +66,18 @@ jobs:
         run: npm publish .local/*.tgz
         env:
           NODE_AUTH_TOKEN: ${{ github.token }}
+      - name: Verify private package and registry artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "orgs/${GITHUB_REPOSITORY_OWNER}/packages/npm/openclaw-connections" |
+          jq --exit-status --arg repository "$GITHUB_REPOSITORY" \
+            '.visibility == "private" and .repository.full_name == $repository'
+          version=$(node -p 'require("./package.json").version')
+          mkdir -p .local/registry
+          npm pack "@raw-labs/openclaw-connections@$version" --pack-destination .local/registry
+          cmp .local/*.tgz .local/registry/*.tgz
       - name: Attach installable release artifact
         env:
           GH_TOKEN: ${{ github.token }}

@@ -21,7 +21,7 @@ when needed; execution uses the exact described version and account generation.
 Requires Node `24.16+` within Node 24, or `26.1+`, and OpenClaw `2026.9.8`, the pinned SDK
 target. Other OpenClaw versions need compatibility verification before use.
 The package name is `@raw-labs/openclaw-connections`, prepared for private distribution through
-GitHub Packages. The first publication is pending the storage compatibility decision.
+GitHub Packages.
 See [releases and private package access](RELEASING.md).
 
 ```sh
@@ -31,7 +31,7 @@ pnpm check
 pnpm build
 pnpm test:native
 pnpm artifact
-openclaw plugins install npm-pack:/absolute/path/to/openclaw-connections/.local/raw-labs-openclaw-connections-0.1.0.tgz --force --accept-capabilities
+openclaw plugins install npm-pack:/absolute/path/to/package.tgz --force --accept-capabilities
 ```
 
 Review the package before accepting its native plugin capabilities. Configure
@@ -111,11 +111,13 @@ lookup and paged results use the same `connections_call` tool. See the bundled
 
 ## State and trust
 
-The storage compatibility decision is deferred. Current state lives at
+State lives at
 `<OpenClaw state directory>/connections/connections.sqlite`, created
 with owner-only permissions. It stores account references, names, grants, pending setup
 links/ticket hashes and call receipts/results; it never stores the Composio project key
-or service OAuth tokens. A single Gateway owns this state directory. Back it up as
+or service OAuth tokens. Persist the entire `connections` directory across Gateway
+or container replacement; retaining only selected OpenClaw subdirectories can lose
+this plugin's state. Do not run multiple Gateways against the same database. Back it up as
 sensitive data: results can contain information from your connected services.
 
 Management uses authenticated native Gateway RPC requiring `operator.admin`. There is
@@ -143,7 +145,10 @@ runtime dependencies, their licenses and the native Control UI using OpenClaw's 
 builder. `pnpm artifact` produces the installable tarball under ignored `.local/`.
 `pnpm test:native` installs the already-built package in temporary vanilla OpenClaw
 state, exercising Gateway startup, administrator RPC, the official Codex dynamic-tool
-bridge, duplicate-call recovery, restart and disablement. Chromium loads the packed
+bridge with the packed plugin's actual tool factories and schemas, native agent/session
+binding, duplicate-call recovery, restart and disablement. The bridge test uses an
+isolated public-SDK host fixture; Gateway installation and RPC are exercised separately.
+Chromium loads the packed
 UI asset served by the Gateway through a small public-SDK host fixture with real
 native RPC; this checks rendering on desktop and mobile, without automating the full
 OpenClaw shell or its plugin consent flow. The plugin has no

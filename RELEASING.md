@@ -17,7 +17,8 @@ Its workflow explicitly dispatches CI on that PR's branch: PRs created by
 `GITHUB_TOKEN` otherwise do not trigger PR workflows. Review and merge the release PR
 only after its `verify` check passes. The release workflow then creates `vVERSION`
 and the GitHub Release, checks the tagged source again, builds and inspects the tarball,
-publishes that same tarball to GitHub Packages and attaches it to the Release.
+publishes that same tarball to GitHub Packages, verifies private visibility and its
+repository link, compares a registry download with the tarball, and attaches it to the Release.
 Publication uses the workflow's `GITHUB_TOKEN` with `packages: write`; no long-lived
 publishing credential belongs in the repository.
 
@@ -67,7 +68,7 @@ An OCE deployment can bake the pinned tarball into its Gateway image and configu
 this native plugin. Image changes, secret bindings, persistent-volume configuration
 and replacement testing belong to the deployment repository. A plugin picker is not
 required. [State and trust](README.md#state-and-trust) describes the current storage
-contract; it must be settled before the first package is published for the pilot.
+contract, including the directory that deployments must persist.
 
 References: [GitHub npm registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry),
 [Release Please action](https://github.com/googleapis/release-please-action).
