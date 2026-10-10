@@ -75,8 +75,9 @@ jobs:
           if npm pack "@raw-labs/openclaw-connections@$version" --json --pack-destination .local/registry > .local/registry-result.json; then
             cmp .local/*.tgz .local/registry/*.tgz
           else
-            # Only a structured not-found response authorizes first publication.
-            node -e 'if (require("./.local/registry-result.json").error?.code !== "E404") process.exit(1)'
+            # npm reports E404 for a missing package, ETARGET for a missing
+            # version of an existing package. Auth/transport failures stay fatal.
+            node -e 'if (!["E404", "ETARGET"].includes(require("./.local/registry-result.json").error?.code)) process.exit(1)'
             npm publish .local/*.tgz
           fi
         env:
