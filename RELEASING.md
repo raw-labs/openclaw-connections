@@ -25,7 +25,9 @@ publishing credential belongs in the repository.
 A failed publication leaves the tag/Release intact. Dispatch the Release workflow
 with its existing `tag` to finish publication using the current workflow and the
 tagged source. An existing registry version must match the verified tarball byte for
-byte before publication is skipped; a mismatch fails. Leave `tag` empty for normal
+byte before publication is skipped; a mismatch fails. Only structured npm `E404`
+(missing package) or `ETARGET` (missing version) permits first publication; authentication
+and transport failures stop the workflow. Leave `tag` empty for normal
 Release Please runs. An existing Release archive is also compared and kept; mismatches
 fail rather than replacing it. Never delete or reuse an already-published version. Fix a
 published defect with a new version. GitHub Actions run artifacts also
