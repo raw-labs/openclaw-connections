@@ -61,6 +61,14 @@ export does not affect an already-running service. Native file/exec SecretRefs a
 also supported. Declare their providers in OpenClaw's secrets configuration.
 The key is never delivered to the Connections page or agent tool arguments.
 
+With no key configured, Connections stays available and shows configuration guidance.
+When OpenClaw isolates an unavailable authored SecretRef, the page and management RPC
+remain registered and report its native capability-secret diagnostic. Provider tools stay inactive;
+no Connections database is opened and no provider requests are made. Fix the native
+secret binding and restart the Gateway. A resolved key enables the capability but does
+not prove provider acceptance or account consent; those failures remain visible during use.
+Native startup rejection for secret-provider policy or contract violations still applies.
+
 Enable custom native Control UI plugins using the pinned OpenClaw build's
 `gateway.controlUi.experimental.customPlugins` setting, and accept its native UI consent
 when requested. Keep your existing Gateway authentication and tool policy. Installing
@@ -144,7 +152,9 @@ of uncertain mutations in this plugin.
 runtime dependencies, their licenses and the native Control UI using OpenClaw's plugin
 builder. `pnpm artifact` produces the installable tarball under ignored `.local/`.
 `pnpm test:native` installs the already-built package in temporary vanilla OpenClaw
-state, exercising Gateway startup, administrator RPC, the official Codex dynamic-tool
+state, exercising omitted/resolved credentials, isolated env/file/exec secret failures,
+native secret-provider policy rejection, provider denial, account consent, administrator
+RPC, the official Codex dynamic-tool
 bridge with the packed plugin's actual tool factories and schemas, native agent/session
 binding, duplicate-call recovery, restart and disablement. The bridge test uses an
 isolated public-SDK host fixture; Gateway installation and RPC are exercised separately.

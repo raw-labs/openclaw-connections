@@ -27,9 +27,20 @@ export const configSchema = Type.Object(
   },
   { additionalProperties: false },
 );
-export const resolvedConfigSchema = z
+// Native preparation retains the authored reference when its optional capability
+// is unavailable. Accept that envelope without treating it as a credential.
+export const runtimeConfigSchema = z
   .strictObject({
-    apiKey: z.string().trim().min(1).optional(),
+    apiKey: z
+      .union([
+        z.string().trim().min(1),
+        z.strictObject({
+          source: z.enum(["env", "file", "exec"]),
+          provider: z.string().min(1),
+          id: z.string().min(1),
+        }),
+      ])
+      .optional(),
     userId: z.string().trim().min(1).max(256).optional(),
     authConfigIds: z
       .record(z.string(), z.string().trim().min(1).max(256))
@@ -37,5 +48,5 @@ export const resolvedConfigSchema = z
   })
   .refine(
     (value) => value.apiKey || (!value.userId && !value.authConfigIds),
-    "Configure a resolved Composio apiKey before other settings.",
+    "Configure a Composio apiKey before other settings.",
   );

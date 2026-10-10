@@ -115,6 +115,29 @@ await test("native UI shows unconfigured guidance without catalog/account reques
     f.close();
   }
 });
+await test("native UI displays capability unavailability and keeps linking inactive", async () => {
+  const calls: string[] = [];
+  const f = fixture(async (method) => {
+    calls.push(method);
+    throw Error(
+      "Secret owner capability:plugins.entries.openclaw-connections.config.apiKey is configured but unavailable (secret reference was not found).",
+    );
+  });
+  try {
+    await flush();
+    assert.match(f.main.textContent ?? "", /configured but unavailable/);
+    assert.deepEqual(calls, ["connections.status"]);
+    assert.equal(f.dom.window.document.querySelector("a"), null);
+    assert.equal(
+      [...f.dom.window.document.querySelectorAll("button")].some(
+        (node) => node.textContent === "Add connection" && !node.hidden,
+      ),
+      false,
+    );
+  } finally {
+    f.close();
+  }
+});
 await test("empty UI opens the same grouped searchable catalog using native RPC", async () => {
   const f = fixture(async (method) => {
     if (method === "connections.status")

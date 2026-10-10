@@ -6,12 +6,25 @@ globalThis.fetch = async (input, init) => {
   const url = new URL(input instanceof Request ? input.url : String(input));
   if (url.hostname !== "backend.composio.dev")
     return originalFetch(input, init);
+  if (process.env.CONNECTIONS_TEST_REQUESTS)
+    await appendFile(
+      process.env.CONNECTIONS_TEST_REQUESTS,
+      `${url.pathname}\n`,
+    );
   assert.equal(
     new Headers(init?.headers).get("x-api-key"),
     "synthetic-never-sent-project-key",
   );
   const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
   const path = url.pathname;
+  if (
+    path === "/api/v3.1/connected_accounts/link" &&
+    body.auth_config_id === "ac_invalid"
+  )
+    return Response.json(
+      { error: { message: "Invalid synthetic project credential" } },
+      { status: 401 },
+    );
   if (path === "/api/v3.1/connected_accounts/link") {
     assert.equal(body.auth_config_id, "ac_native");
     return Response.json({
