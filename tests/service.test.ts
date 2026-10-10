@@ -504,6 +504,32 @@ await test("conflicting grant changes serialize behind admitted execution", asyn
     await f.service.close();
   }
 });
+await test("separate Gateway stores generate independent identities and retain them across restart", async () => {
+  const directory = await mkdtemp(
+    join(tmpdir(), "openclaw-connections-identities-"),
+  );
+  try {
+    const firstPath = join(directory, "first", "connections.sqlite");
+    const first = new ConnectionStore(firstPath);
+    const second = new ConnectionStore(
+      join(directory, "second", "connections.sqlite"),
+    );
+    const firstId = first.userId;
+    assert.match(firstId, /^openclaw-/);
+    assert.notEqual(firstId, second.userId);
+    first.close();
+    second.close();
+    const restarted = new ConnectionStore(firstPath);
+    assert.equal(restarted.userId, firstId);
+    restarted.close();
+    assert.throws(
+      () => new ConnectionStore(firstPath, "different-identity"),
+      /retained identity/,
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 await test("restart marks interrupted dispatch and setup unknown and retains identity without provider keys", async () => {
   const directory = await mkdtemp(
     join(tmpdir(), "openclaw-connections-store-"),

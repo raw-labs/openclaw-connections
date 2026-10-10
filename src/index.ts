@@ -1,13 +1,14 @@
 import { join } from "node:path";
 import { Type } from "typebox";
 import { defineToolPlugin } from "openclaw/plugin-sdk/tool-plugin";
+import { assertPluginCapabilitySecretAvailable } from "openclaw/plugin-sdk/secret-input-runtime";
 import type {
   OpenClawPluginApi,
   OpenClawPluginToolContext,
 } from "openclaw/plugin-sdk/plugin-entry";
 import type { AgentToolResult } from "openclaw/plugin-sdk/tool-results";
 import { z } from "zod";
-import { configSchema, resolvedConfigSchema } from "./config.js";
+import { configSchema, runtimeConfigSchema } from "./config.js";
 import { managementInputs, managementOutputs } from "./contracts.js";
 import { ConnectionError, failure } from "./errors.js";
 import { ConnectionsService, type NativeContext } from "./service.js";
@@ -18,8 +19,34 @@ import { createComposioProvider } from "./providers/composio/provider.js";
 
 const holders = new WeakMap<
   OpenClawPluginApi,
-  { service?: ConnectionsService; configured: boolean }
+  { service?: ConnectionsService; configured: boolean; referenced: boolean }
 >();
+const secretOwner = "plugins.entries.openclaw-connections.config.apiKey";
+function assertCredentialAvailable(api: OpenClawPluginApi) {
+  try {
+    assertPluginCapabilitySecretAvailable(secretOwner);
+  } catch (error) {
+    // Only the native assertion supplies this diagnostic. Preserve its redacted
+    // owner error rather than reporting an authored binding as omitted config.
+    const diagnostic = z
+      .object({
+        code: z.literal("SECRET_SURFACE_UNAVAILABLE"),
+        ownerKind: z.literal("capability"),
+        ownerId: z.literal(secretOwner),
+        message: z.string(),
+      })
+      .safeParse(error);
+    if (diagnostic.success)
+      throw new ConnectionError(diagnostic.data.code, diagnostic.data.message);
+    throw error;
+  }
+  const holder = holders.get(api);
+  if (holder?.referenced && !holder.configured)
+    throw new ConnectionError(
+      "secret_unavailable",
+      "The Composio apiKey reference was not materialized by OpenClaw. Check its native secret provider, then restart the Gateway.",
+    );
+}
 const identity = Type.String({ minLength: 1, maxLength: 256 });
 const searchParameters = Type.Object(
   {
@@ -61,6 +88,7 @@ const callParameters = Type.Union([
   ),
 ]);
 function runtime(api: OpenClawPluginApi) {
+  assertCredentialAvailable(api);
   const service = holders.get(api)?.service;
   if (!service)
     throw new ConnectionError(
@@ -135,8 +163,8 @@ const plugin = defineToolPlugin({
       description:
         "Find operations on accounts available to this agent. Use exact connection and action IDs from these results.",
       parameters: searchParameters,
-      factory: ({ api, config, toolContext }) =>
-        !config.apiKey
+      factory: ({ api, toolContext }) =>
+        !holders.get(api)?.configured
           ? null
           : {
               name: "connections_search",
@@ -159,8 +187,8 @@ const plugin = defineToolPlugin({
       description:
         "Describe an exact account operation before calling it. Provider schemas are advisory; preserve the returned account generation and action version.",
       parameters: describeParameters,
-      factory: ({ api, config, toolContext }) =>
-        !config.apiKey
+      factory: ({ api, toolContext }) =>
+        !holders.get(api)?.configured
           ? null
           : {
               name: "connections_describe",
@@ -181,8 +209,8 @@ const plugin = defineToolPlugin({
       description:
         "Execute a described operation, look up a prior native toolCallId in this session, or read a saved result. Execute can affect external systems. Never execute again to recover an unknown outcome or missing result.",
       parameters: callParameters,
-      factory: ({ api, config, toolContext }) =>
-        !config.apiKey
+      factory: ({ api, toolContext }) =>
+        !holders.get(api)?.configured
           ? null
           : {
               name: "connections_call",
@@ -204,16 +232,23 @@ const plugin = defineToolPlugin({
 });
 const registerTools = plugin.register;
 plugin.register = (api) => {
-  const config = resolvedConfigSchema.parse(api.pluginConfig ?? {});
-  const holder: { service?: ConnectionsService; configured: boolean } = {
-    configured: Boolean(config.apiKey),
+  const config = runtimeConfigSchema.parse(api.pluginConfig ?? {});
+  const apiKey = typeof config.apiKey === "string" ? config.apiKey : undefined;
+  const holder: {
+    service?: ConnectionsService;
+    configured: boolean;
+    referenced: boolean;
+  } = {
+    configured: Boolean(apiKey),
+    referenced: typeof config.apiKey === "object",
   };
   holders.set(api, holder);
   registerTools(api);
   api.registerService({
     id: "openclaw-connections",
     start() {
-      if (!config.apiKey) return;
+      if (!apiKey) return;
+      assertCredentialAvailable(api);
       const store = new ConnectionStore(
         join(
           api.runtime.state.resolveStateDir(),
@@ -224,11 +259,11 @@ plugin.register = (api) => {
       );
       holder.service = new ConnectionsService(
         store,
-        createComposioProvider({ apiKey: config.apiKey }),
+        createComposioProvider({ apiKey }),
         new ComposioCatalog(
           packagedCatalog(),
           new ComposioHttp({
-            apiKey: config.apiKey,
+            apiKey,
             maximumJsonBytes: 32 * 1024 * 1024,
           }),
         ),
@@ -277,6 +312,7 @@ plugin.register = (api) => {
           let result: unknown;
           if (name === "status" && !holder.configured) {
             managementInputs.status.parse(params);
+            assertCredentialAvailable(api);
             result = { configured: false, userId: null };
           } else {
             const actor =

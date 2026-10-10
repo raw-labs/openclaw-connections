@@ -13,6 +13,54 @@ assert.equal(process.env.COMPOSIO_API_KEY, "synthetic-never-sent-project-key");
 const { default: plugin } = await import(pathToFileURL(entryPath).href);
 const metadata = getToolPluginMetadata(plugin);
 assert.ok(metadata);
+// An SDK host without native preparation must never resolve this cold reference,
+// even though the synthetic environment value is present in this process.
+const coldFactories = [],
+  coldServices = [],
+  coldMethods = new Map();
+await plugin.register(
+  new Proxy(
+    {
+      pluginConfig: {
+        apiKey: { source: "env", provider: "default", id: "COMPOSIO_API_KEY" },
+      },
+      registerTool(factory) {
+        coldFactories.push(factory);
+      },
+      registerService(service) {
+        coldServices.push(service);
+      },
+      registerGatewayMethod(name, handler) {
+        coldMethods.set(name, handler);
+      },
+    },
+    {
+      get(target, key) {
+        assert.ok(
+          Object.hasOwn(target, key),
+          `Cold reference accessed unexpected SDK property ${String(key)}`,
+        );
+        return Reflect.get(target, key);
+      },
+    },
+  ),
+);
+await coldServices[0].start();
+assert.equal(coldMethods.size, 12);
+assert.equal(coldFactories.length, 3);
+for (const factory of coldFactories)
+  assert.equal(factory({ agentId: "main" }), null);
+await coldMethods.get("connections.status")({
+  params: {},
+  client: { connect: { role: "operator", scopes: ["operator.admin"] } },
+  respond(ok, value, error) {
+    assert.equal(ok, false);
+    assert.equal(value, undefined);
+    assert.equal(error.details.code, "secret_unavailable");
+    assert.doesNotMatch(error.message, /synthetic-never-sent/);
+  },
+});
+await coldServices[0].stop();
 const factories = new Map();
 const services = [];
 const methods = new Map();

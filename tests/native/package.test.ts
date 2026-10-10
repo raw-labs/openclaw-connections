@@ -2,7 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createServer } from "node:net";
@@ -29,8 +36,8 @@ async function freePort() {
 }
 await test(
   "packed plugin installs in vanilla OpenClaw, loads native UI/RPC/tools, survives restart and disablement",
-  { timeout: 180_000 },
-  async () => {
+  { timeout: 300_000 },
+  async (context) => {
     const directory = await mkdtemp(
       join(tmpdir(), "openclaw-connections-native-"),
     );
@@ -46,6 +53,7 @@ await test(
       OPENCLAW_CONFIG_PATH: configPath,
       COMPOSIO_API_KEY: "synthetic-never-sent-project-key",
       CONNECTIONS_TEST_EXECUTIONS: join(directory, "executions.log"),
+      CONNECTIONS_TEST_REQUESTS: join(directory, "provider-requests.log"),
     };
     await mkdir(home);
     await mkdir(state);
@@ -153,6 +161,243 @@ await test(
         })
         .passthrough()
         .parse(JSON.parse(await readFile(configPath, "utf8")));
+      const missingFile = join(directory, "empty-secrets.json");
+      await writeFile(missingFile, "{}", { mode: 0o600 });
+      const states = [
+        { label: "omitted", pluginConfig: {}, secrets: {} },
+        {
+          label: "env reference not found",
+          pluginConfig: {
+            apiKey: {
+              source: "env",
+              provider: "default",
+              id: "CONNECTIONS_NATIVE_MISSING_KEY",
+            },
+            userId: "native-test-owner",
+            authConfigIds: { github: "ac_native" },
+          },
+          secrets: {},
+        },
+        {
+          label: "file reference not found",
+          pluginConfig: {
+            apiKey: { source: "file", provider: "fixture", id: "/missing" },
+          },
+          secrets: {
+            providers: {
+              fixture: { source: "file", path: missingFile, mode: "json" },
+            },
+          },
+        },
+        {
+          label: "exec provider failed",
+          pluginConfig: {
+            apiKey: { source: "exec", provider: "fixture", id: "missing" },
+          },
+          secrets: {
+            providers: {
+              fixture: {
+                source: "exec",
+                command: process.execPath,
+                args: ["-e", "process.exit(1)"],
+              },
+            },
+          },
+        },
+        {
+          label: "env provider policy denied",
+          startupRejected: true,
+          pluginConfig: {
+            apiKey: {
+              source: "env",
+              provider: "fixture",
+              id: "COMPOSIO_API_KEY",
+            },
+          },
+          secrets: {
+            providers: {
+              fixture: { source: "env", allowlist: ["ANOTHER_ALLOWED_KEY"] },
+            },
+          },
+        },
+      ];
+      assert.equal(process.env.CONNECTIONS_NATIVE_MISSING_KEY, undefined);
+      for (const scenario of states) {
+        context.diagnostic(`Checking ${scenario.label}`);
+        await writeFile(
+          configPath,
+          JSON.stringify({
+            ...installed,
+            gateway: config.gateway,
+            secrets: scenario.secrets,
+            plugins: {
+              ...installed.plugins,
+              entries: {
+                ...installed.plugins.entries,
+                "openclaw-connections": {
+                  enabled: true,
+                  config: scenario.pluginConfig,
+                },
+              },
+            },
+          }),
+        );
+        if ("startupRejected" in scenario) {
+          // OpenClaw deliberately rejects non-retryable provider-policy failures
+          // before plugin registration. The plugin must not weaken that policy.
+          await assert.rejects(start(), /required secrets are unavailable/);
+          await assert.rejects(access(join(state, "connections")));
+          await assert.rejects(access(env.CONNECTIONS_TEST_REQUESTS));
+          assert.doesNotMatch(diagnostics, /synthetic-never-sent-project-key/);
+          await stop();
+          continue;
+        }
+        try {
+          await start();
+        } catch (error) {
+          throw new Error(`Secret scenario failed: ${scenario.label}`, {
+            cause: error,
+          });
+        }
+        let ready: () => void = () => {};
+        let reject: (error: Error) => void = () => {};
+        const connected = new Promise<void>((resolve, failed) => {
+          ready = resolve;
+          reject = failed;
+        });
+        const client = new GatewayClient({
+          url: `ws://127.0.0.1:${port}`,
+          token,
+          clientName: "cli",
+          mode: "cli",
+          role: "operator",
+          scopes: ["operator.admin"],
+          deviceIdentity: null,
+          env,
+          onHelloOk: ready,
+          onConnectError: reject,
+        });
+        try {
+          client.start();
+          await connected;
+          if (scenario.label === "omitted")
+            assert.deepEqual(await client.request("connections.status", {}), {
+              configured: false,
+              userId: null,
+            });
+          else
+            await assert.rejects(
+              client.request("connections.status", {}),
+              (error: unknown) => {
+                const diagnostic = z
+                  .object({
+                    message: z.string(),
+                    details: z.object({
+                      code: z.literal("SECRET_SURFACE_UNAVAILABLE"),
+                    }),
+                  })
+                  .parse(error);
+                assert.match(
+                  diagnostic.message,
+                  /capability:.*apiKey.*unavailable/,
+                );
+                assert.doesNotMatch(
+                  diagnostic.message,
+                  /synthetic-never-sent|CONNECTIONS_NATIVE_MISSING_KEY/,
+                );
+                return true;
+              },
+            );
+          await assert.rejects(
+            client.request("connections.list", {}),
+            scenario.label === "omitted"
+              ? /Configure the plugin/
+              : /unavailable/,
+          );
+          const catalog = z
+            .object({
+              plugins: z.array(
+                z.object({ pluginId: z.string(), entryUrl: z.string() }),
+              ),
+            })
+            .parse(await client.request("plugins.controlUi.list", {}));
+          const ui = catalog.plugins.find(
+            (item) => item.pluginId === "openclaw-connections",
+          );
+          assert.ok(ui, scenario.label);
+          const browser = await chromium.launch();
+          try {
+            const page = await browser.newPage({
+              extraHTTPHeaders: { authorization: `Bearer ${token}` },
+            });
+            await page.exposeFunction(
+              "nativeRequest",
+              (method: string, params: Record<string, unknown>) =>
+                client.request(method, params),
+            );
+            await page.goto(`http://127.0.0.1:${port}/`);
+            await page.evaluate(
+              `globalThis.connectionsTestEntry = ${JSON.stringify(ui.entryUrl)}`,
+            );
+            await page.evaluate(
+              await readFile(
+                join(root, "tests/native/browser-fixture.mjs"),
+                "utf8",
+              ),
+            );
+            await page
+              .getByText(
+                scenario.label === "omitted"
+                  ? "Configure Composio"
+                  : /Secret owner capability:.*unavailable/,
+              )
+              .waitFor();
+            assert.equal(
+              await page
+                .getByRole("button", { name: "Add connection", exact: true })
+                .isVisible(),
+              false,
+            );
+            assert.doesNotMatch(
+              await page.locator("body").innerText(),
+              /synthetic-never-sent/,
+            );
+          } finally {
+            await browser.close();
+          }
+          for (const tool of [
+            "connections_search",
+            "connections_describe",
+            "connections_call",
+          ]) {
+            const result = await fetch(
+              `http://127.0.0.1:${port}/tools/invoke`,
+              {
+                method: "POST",
+                headers: {
+                  "content-type": "application/json",
+                  authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ tool, args: {}, agentId: "main" }),
+              },
+            );
+            assert.equal(
+              result.status,
+              404,
+              `${scenario.label}: ${await result.text()}`,
+            );
+          }
+          assert.doesNotMatch(
+            diagnostics,
+            /openclaw-connections failed during register|synthetic-never-sent-project-key/,
+          );
+          await assert.rejects(access(join(state, "connections")));
+          await assert.rejects(access(env.CONNECTIONS_TEST_REQUESTS));
+        } finally {
+          client.stop();
+          await stop();
+        }
+      }
       await writeFile(
         configPath,
         JSON.stringify({
@@ -166,7 +411,7 @@ await test(
                 enabled: true,
                 config: {
                   userId: "native-test-owner",
-                  authConfigIds: { github: "ac_native" },
+                  authConfigIds: { github: "ac_native", slack: "ac_invalid" },
                   apiKey: {
                     source: "env",
                     provider: "default",
@@ -277,6 +522,34 @@ await test(
       ): Promise<unknown> => admin.request(method, params);
       try {
         await adminHello;
+        const invalid = managementOutputs.create.parse(
+          await rpc("connections.create", {
+            connectorId: "slack",
+            name: "Rejected provider credential",
+            grant: { mode: "all" },
+          }),
+        );
+        await assert.rejects(
+          rpc("connections.start", {
+            connectionId: invalid.id,
+            revision: invalid.revision,
+          }),
+          /Invalid synthetic project credential/,
+        );
+        const failed = managementOutputs.list
+          .parse(await rpc("connections.list"))
+          .items.find((item) => item.id === invalid.id);
+        assert.ok(failed);
+        assert.equal(failed.state, "needs_attention");
+        assert.equal(failed.setup?.state, "cancelled");
+        assert.match(
+          failed.failure?.detail ?? "",
+          /Invalid synthetic project credential/,
+        );
+        await rpc("connections.disconnect", {
+          connectionId: failed.id,
+          revision: failed.revision,
+        });
         const created = managementOutputs.create.parse(
           await rpc("connections.create", {
             connectorId: "github",
@@ -291,6 +564,39 @@ await test(
           }),
         );
         assert.ok(setup.setup);
+        const beforeConsent = await fetch(
+          `http://127.0.0.1:${port}/tools/invoke`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              tool: "connections_search",
+              args: {},
+              agentId: "main",
+            }),
+          },
+        );
+        assert.equal(beforeConsent.status, 200);
+        assert.match(await beforeConsent.text(), /no_usable_connections/);
+        const beforeWrongTicket = await readFile(
+          env.CONNECTIONS_TEST_REQUESTS,
+          "utf8",
+        );
+        await assert.rejects(
+          rpc("connections.complete", {
+            connectionId: created.id,
+            setupId: setup.setup.id,
+            ticket: "wrong-browser-ticket",
+          }),
+          /browser that started/,
+        );
+        assert.equal(
+          await readFile(env.CONNECTIONS_TEST_REQUESTS, "utf8"),
+          beforeWrongTicket,
+        );
         const connected = managementOutputs.complete.parse(
           await rpc("connections.complete", {
             connectionId: created.id,

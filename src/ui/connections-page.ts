@@ -40,6 +40,7 @@ export const connections = (
     void view.run(add, "Loading services…");
   };
   const addButton = button("Add connection", addConnection, "primary");
+  addButton.hidden = true;
   view.header.append(
     button(
       "Refresh",
