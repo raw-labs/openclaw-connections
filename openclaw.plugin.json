@@ -1,7 +1,7 @@
 {
   "id": "openclaw-connections",
   "name": "Connections",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Connect your services through your own Composio project.",
   "skills": [
     "./skills"
