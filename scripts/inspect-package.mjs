@@ -1,3 +1,4 @@
+import { assertPinnedHost } from "./pinned-host.mjs";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { readFile, mkdir } from "node:fs/promises";
@@ -9,7 +10,18 @@ const manifest = JSON.parse(await readFile("openclaw.plugin.json", "utf8"));
 assert.equal(pkg.name, "@raw-labs/openclaw-connections");
 assert.equal(manifest.id, "openclaw-connections");
 assert.equal(manifest.version, pkg.version);
-assert.equal(pkg.peerDependencies.openclaw, pkg.devDependencies.openclaw);
+const { pin } = await assertPinnedHost();
+assert.equal(pkg.devDependencies.openclaw, pin.version);
+assert.equal(pkg.devDependencies["@openclaw/codex"], pin.version);
+assert.equal(
+  pkg.peerDependencies.openclaw,
+  pin.compatibleVersions.join(" || "),
+);
+assert.equal(
+  pkg.openclaw.compat.pluginApi,
+  `>=${pin.version} <=${pin.compatibleVersions.at(-1)}`,
+);
+assert.equal(pkg.openclaw.build.openclawVersion, pin.version);
 assert.equal(
   pkg.openclaw.compat.minGatewayVersion,
   pkg.devDependencies.openclaw,
@@ -27,7 +39,7 @@ const pack = packs[0];
 for (const file of pack.files) {
   assert.match(
     file.path,
-    /^(?:dist\/|assets\/|skills\/|package\.json$|openclaw\.plugin\.json$|README\.md$|AGENTS\.md$|RELEASING\.md$|LICENSE$|NOTICE$|THIRD_PARTY_NOTICES\.md$)/,
+    /^(?:dist\/|assets\/|skills\/|openclaw-host\.json$|package\.json$|openclaw\.plugin\.json$|README\.md$|AGENTS\.md$|RELEASING\.md$|LICENSE$|NOTICE$|THIRD_PARTY_NOTICES\.md$)/,
   );
   assert.doesNotMatch(
     file.path,
@@ -35,6 +47,7 @@ for (const file of pack.files) {
   );
 }
 for (const path of [
+  "openclaw-host.json",
   "dist/index.js",
   "assets/catalog.json",
   "skills/connections/SKILL.md",

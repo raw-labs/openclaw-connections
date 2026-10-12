@@ -18,13 +18,14 @@
     "RELEASING.md",
     "LICENSE",
     "NOTICE",
-    "THIRD_PARTY_NOTICES.md"
+    "THIRD_PARTY_NOTICES.md",
+    "openclaw-host.json"
   ],
   "exports": {
     ".": "./dist/index.js"
   },
   "peerDependencies": {
-    "openclaw": "2026.10.2"
+    "openclaw": "2026.9.8 || 2026.10.2"
   },
   "peerDependenciesMeta": {
     "openclaw": {
@@ -36,37 +37,38 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "@openclaw/codex": "2026.10.2",
+    "@openclaw/codex": "2026.9.8",
     "@types/jsdom": "21.1.7",
     "@types/node": "24.10.13",
     "esbuild": "0.27.4",
     "jsdom": "26.1.0",
-    "openclaw": "2026.10.2",
+    "openclaw": "2026.9.8",
     "playwright": "1.63.0",
     "prettier": "3.9.7",
     "tsx": "4.23.13",
     "typescript": "6.0.3"
   },
   "scripts": {
-    "check": "prettier --check . && tsc --noEmit && pnpm test",
-    "test": "node --import tsx --test tests/*.test.ts",
+    "check": "node scripts/check-host.mjs && prettier --check . && tsc --noEmit && pnpm test",
+    "test": "node scripts/check-host.mjs && node --import tsx --test tests/*.test.ts",
     "build": "node scripts/build.mjs",
     "format": "prettier --write .",
     "artifact": "pnpm build && npm pack --pack-destination .local",
-    "test:native": "node --import tsx --test tests/native/*.test.ts",
-    "inspect:package": "node scripts/inspect-package.mjs"
+    "test:native": "node scripts/check-host.mjs && node --import tsx --test tests/native/*.test.ts",
+    "inspect:package": "node scripts/inspect-package.mjs",
+    "prepare:host": "node scripts/prepare-host.mjs"
   },
   "openclaw": {
     "extensions": [
       "./dist/index.js"
     ],
     "compat": {
-      "pluginApi": "2026.10.2",
-      "minGatewayVersion": "2026.10.2"
+      "pluginApi": ">=2026.9.8 <=2026.10.2",
+      "minGatewayVersion": "2026.9.8"
     },
     "build": {
-      "openclawVersion": "2026.10.2",
-      "pluginSdkVersion": "2026.10.2"
+      "openclawVersion": "2026.9.8",
+      "pluginSdkVersion": "2026.9.8"
     },
     "controlUi": "./src/control-ui.ts"
   },

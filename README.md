@@ -18,18 +18,26 @@ when needed; execution uses the exact described version and account generation.
 
 ## Install and configure
 
-Requires Node `24.16+` within Node 24, or `26.1+`, and OpenClaw `2026.10.2`, the pinned SDK
-target. The host must provide runtime-bound `openKeyedStore` with
-`retention: "retained"`, `registerIfAbsent`, `observe`/`compareAndApply`,
-`entriesInKeyRange` and action-bound `withCurrent`. Missing capabilities, denied state
-access and failed reads stop startup or the operation; there is no custom-file or
-bounded-cache fallback. Other OpenClaw versions need compatibility verification before use.
+Requires Node `24.16+` within Node 24, or `26.1+`. The primary OpenClaw target is
+source commit `90d30a1178a79dddd92e6190b66b95d89dfb3ca8`, labelled `2026.9.8`,
+the revision selected by OCE. The previously qualified published `2026.10.2` host
+also remains admitted. Version labels alone are insufficient: the published npm
+`2026.9.8` package is an older snapshot that refuses private-plugin state and is
+**not supported**. Use the specified source-built host, not that npm package.
+
+The host must provide runtime-bound `openKeyedStore` with `retention: "retained"`,
+`registerIfAbsent`, `observe`/`compareAndApply`, `entriesInKeyRange` and action-bound
+`withCurrent`. Missing capabilities, denied state access and failed reads stop startup
+or the operation; there is no custom-file or bounded-cache fallback. Other revisions
+need compatibility verification before use. The source commit and archive checksum
+are recorded in [openclaw-host.json](openclaw-host.json).
 The package name is `@raw-labs/openclaw-connections`, prepared for private distribution through
 GitHub Packages.
 See [releases and private package access](RELEASING.md).
 
 ```sh
 pnpm install --frozen-lockfile
+pnpm prepare:host
 pnpm exec playwright install chromium
 pnpm check
 pnpm build
@@ -152,12 +160,13 @@ lookup still scan retained history.
 This storage cutover starts fresh: there is no import of an old custom SQLite file,
 migration or dual write. Existing custom files are neither read nor deleted.
 
-The published OpenClaw `2026.10.2` host supports plugin-scoped state for all
-loaded plugins, including private packages and local installs. OpenClaw `2026.9.8`
-is not supported by this release: its published host denied this plugin's state access.
-The plugin requires the public retained/CAS and action-authority contracts, without
-trust bypasses or internal database facades. Never downgrade a host against expanded
-retained state without restoring a compatible backup.
+The pinned source build supports plugin-scoped state for all loaded plugins,
+including private packages and local installs. Its `2026.9.8` label differs from the
+published npm package with that same label. Connections 0.2.1 corrects the 0.2.0
+version gate that rejected this source build. Public retained/CAS and action-authority
+contracts remain mandatory; no trust bypass or internal database facade is used.
+Never downgrade a host against expanded retained state without restoring a compatible
+backup.
 
 Management uses authenticated native Gateway RPC requiring `operator.admin`. There is
 no browser-facing provider credential or separate HTTP management API. The Gateway
@@ -179,10 +188,18 @@ of uncertain mutations in this plugin.
 
 ## Development
 
+`pnpm prepare:host` downloads the checksum-pinned upstream source under ignored
+`.local/openclaw-host/`, installs its frozen dependency graph with its pinned pnpm,
+builds the Gateway/SDK/UI and links it as this project's development SDK. It does not
+change a deployment or another checkout. CI and tagged publication perform this step;
+checks assert the host's actual build commit, not just its version. The bootstrap npm
+SDK dependency is replaced for qualification; it is not evidence that stock npm
+`2026.9.8` works. OpenClaw remains external to the shipped plugin.
+
 `pnpm check` checks formatting, strict TypeScript and regressions. `pnpm build` bundles
 runtime dependencies, their licenses and the native Control UI using OpenClaw's plugin
 builder. `pnpm artifact` produces the installable tarball under ignored `.local/`.
-`pnpm test:native` installs the already-built package in temporary vanilla OpenClaw
+`pnpm test:native` installs the already-built package in temporary pinned-source OpenClaw
 state, exercising omitted/resolved credentials, isolated env/file/exec secret failures,
 native secret-provider policy rejection, provider denial, account consent, administrator
 RPC, the official Codex dynamic-tool

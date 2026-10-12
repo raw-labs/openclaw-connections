@@ -35,8 +35,8 @@ async function freePort() {
   return address.port;
 }
 await test(
-  "packed plugin installs in vanilla OpenClaw, loads native UI/RPC/tools, survives restart and disablement",
-  { timeout: 300_000 },
+  "packed plugin installs in the qualified source OpenClaw, loads native UI/RPC/tools, survives restart and disablement",
+  { timeout: 600_000 },
   async (context) => {
     const directory = await mkdtemp(
       join(tmpdir(), "openclaw-connections-native-"),
