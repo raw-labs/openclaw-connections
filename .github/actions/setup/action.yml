@@ -12,7 +12,7 @@ runs:
       shell: bash
     # Use upstream's consumer CI profile with canonical public SDK declarations.
     - run: |
-        free -m
+        node --input-type=module -e 'import os from "node:os"; console.log({platform: os.platform(), totalMemoryMiB: Math.floor(os.totalmem() / 1024 ** 2), freeMemoryMiB: Math.floor(os.freemem() / 1024 ** 2)})'
         df -h .
         pnpm prepare:host
       shell: bash

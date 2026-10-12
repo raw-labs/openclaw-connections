@@ -45,7 +45,8 @@ jobs:
   publish:
     needs: release
     if: ${{ !cancelled() && (needs.release.outputs.created == 'true' || inputs.tag != '') }}
-    runs-on: ubuntu-24.04
+    # Match the qualified runner and retain memory headroom for SDK declarations.
+    runs-on: macos-15-intel
     timeout-minutes: 45
     permissions:
       contents: write

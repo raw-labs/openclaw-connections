@@ -102,8 +102,12 @@ Preparation uses upstream's `build:ci-artifacts` profile, recorded as `ciArtifac
 in the host pin. It builds the complete Gateway runtime, Control UI, metadata and
 canonical public SDK declarations, including upstream's SDK export checks. It
 does not generate unused declarations for the entire OpenClaw application.
-Previous generated host output is cleared before preparation. Linux jobs use
-upstream's `OPENCLAW_TSDOWN_MAX_OLD_SPACE_MB=4352` compiler heap setting.
+Previous generated host output is cleared before preparation. CI verification and
+publication use the standard `macos-15-intel` runner (14 GB RAM) with upstream's
+`OPENCLAW_TSDOWN_MAX_OLD_SPACE_MB=4352` compiler heap setting. The 8 GB Linux runner
+for private repositories does not provide reliable memory headroom for this SDK's
+declaration compiler. The plugin package contains portable JavaScript; native
+Gateway/Chromium acceptance runs on the same runner before publication.
 A version-only test is insufficient for this source target. Connections 0.2.1 is the
 patch correcting the 0.2.0 gate; publication still uses only workflow tokens.
 

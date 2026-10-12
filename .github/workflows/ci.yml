@@ -12,7 +12,8 @@ concurrency:
 jobs:
   verify:
     name: verify
-    runs-on: ubuntu-24.04
+    # Private-repository Linux runners have 8 GB; SDK declarations need headroom.
+    runs-on: macos-15-intel
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
