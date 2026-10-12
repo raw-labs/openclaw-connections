@@ -4,5 +4,6 @@
   "archiveSha256": "c56ea921a033efd95c2c9e43e4255c675939b0aa927c6aaf5bbdb51d5b693a8b",
   "builtAt": "2026-10-07T22:05:23Z",
   "pnpmVersion": "12.5.1",
+  "buildProfile": "ciArtifacts",
   "compatibleVersions": ["2026.9.8", "2026.10.2"]
 }

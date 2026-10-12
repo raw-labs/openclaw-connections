@@ -12,7 +12,8 @@ concurrency:
 jobs:
   verify:
     name: verify
-    runs-on: ubuntu-24.04
+    # RAW Labs uses Depot; leave headroom for the native SDK declaration compiler.
+    runs-on: depot-ubuntu-24.04-arm-8
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5

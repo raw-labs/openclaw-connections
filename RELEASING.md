@@ -13,10 +13,15 @@ Use conventional commit subjects. Before 1.0, `fix:` and `feat:` advance the pat
 compatibility; consumers pin an exact version. The first release is `0.1.0`.
 
 On main, Release Please opens or updates a release PR with the version and changelog.
-Its workflow explicitly dispatches CI on that PR's branch: PRs created by
-`GITHUB_TOKEN` otherwise do not trigger PR workflows. Review and merge the release PR
-only after its `verify` check passes. If `verify` is missing or a bot-created run
-reports `action_required`, dispatch CI on the release PR's exact head branch:
+Its workflow explicitly dispatches CI on that PR's branch because bot-created PRs
+may omit PR workflows or require maintainer approval. Review and merge the release PR
+only after its required `verify` check passes. If the original PR run reports
+`action_required`, review the release diff and use **Approve and run** on that run's
+Actions page. A dispatched head-branch run does not resolve this pending approval;
+confirm that `verify` appears on the PR itself before merging.
+
+If no PR run is awaiting approval and `verify` is missing, dispatch CI on the
+release PR's exact head branch:
 
 ```sh
 gh workflow run ci.yml --repo raw-labs/openclaw-connections --ref RELEASE_PR_HEAD
@@ -93,6 +98,18 @@ compatibility range. Keep source pin/checksum, SDK dependency labels, peer/API r
 minimum version, build declarations, notices and lockfile aligned when upgrading.
 
 Every CI and publication job runs `pnpm prepare:host` and asserts the built revision.
+Preparation uses upstream's `build:ci-artifacts` profile, recorded as `ciArtifacts`
+in the host pin. It builds the complete Gateway runtime, Control UI, metadata and
+canonical public SDK declarations, including upstream's SDK export checks. It
+does not generate unused declarations for the entire OpenClaw application.
+Previous generated host output is cleared before preparation. CI verification and
+publication use RAW Labs' Depot Linux ARM runner `depot-ubuntu-24.04-arm-8`
+(8 CPUs, 32 GB RAM) with upstream's `OPENCLAW_TSDOWN_MAX_OLD_SPACE_MB=4352`
+compiler heap setting. Qualification measured a 9,055 MiB compiler process-tree
+peak; the V8 setting alone does not bound the native TypeScript compiler. Runner
+capacity also leaves room for Depot's disk accelerator. Release Please uses the
+smaller `depot-ubuntu-24.04-arm` runner. The plugin package contains portable
+JavaScript; native Gateway/Chromium acceptance runs before publication.
 A version-only test is insufficient for this source target. Connections 0.2.1 is the
 patch correcting the 0.2.0 gate; publication still uses only workflow tokens.
 

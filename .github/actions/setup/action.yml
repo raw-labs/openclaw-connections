@@ -10,7 +10,13 @@ runs:
         cache: pnpm
     - run: pnpm install --frozen-lockfile
       shell: bash
-    - run: pnpm prepare:host
+    # Use upstream's consumer CI profile with canonical public SDK declarations.
+    - run: |
+        node --input-type=module -e 'import os from "node:os"; console.log({platform: os.platform(), totalMemoryMiB: Math.floor(os.totalmem() / 1024 ** 2), freeMemoryMiB: Math.floor(os.freemem() / 1024 ** 2)})'
+        df -h .
+        pnpm prepare:host
       shell: bash
+      env:
+        OPENCLAW_TSDOWN_MAX_OLD_SPACE_MB: "4352"
     - run: pnpm exec playwright install --with-deps chromium
       shell: bash

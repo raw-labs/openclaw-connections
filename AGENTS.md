@@ -25,4 +25,6 @@
 - Keep SDK versions, lockfile and compatibility declarations aligned. Package versions
   come from package.json; inspect the packed artifact before release. Preserve private
   visibility and use workflow tokens for publishing.
+- Use RAW Labs' Depot Linux ARM runners for CI and publication, with sufficient
+  memory for pinned SDK qualification.
 - Work only on the requested slice. Preserve unrelated work; push only when authorized.

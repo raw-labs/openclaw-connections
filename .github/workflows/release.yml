@@ -16,7 +16,7 @@ concurrency:
 jobs:
   release:
     if: inputs.tag == ''
-    runs-on: ubuntu-24.04
+    runs-on: depot-ubuntu-24.04-arm
     permissions:
       contents: write
       pull-requests: write
@@ -30,8 +30,9 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-      # GITHUB_TOKEN-created PRs do not trigger pull_request workflows. Explicit
-      # dispatch runs the same required CI on each release PR's own branch.
+      # Bot-created PRs can omit CI or await maintainer approval. Dispatch checks
+      # each head branch; approve a pending original PR run after reviewing its
+      # diff so its required verify check can run (see RELEASING.md).
       - name: Validate release PRs
         env:
           GH_TOKEN: ${{ github.token }}
@@ -44,7 +45,8 @@ jobs:
   publish:
     needs: release
     if: ${{ !cancelled() && (needs.release.outputs.created == 'true' || inputs.tag != '') }}
-    runs-on: ubuntu-24.04
+    # Match CI's Depot runner for SDK qualification and package verification.
+    runs-on: depot-ubuntu-24.04-arm-8
     timeout-minutes: 45
     permissions:
       contents: write

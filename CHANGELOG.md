@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/raw-labs/openclaw-connections/compare/v0.2.0...v0.2.1) (2026-10-12)
+
+
+### Bug Fixes
+
+* qualify the OCE-pinned OpenClaw source host ([f038323](https://github.com/raw-labs/openclaw-connections/commit/f03832369a6248d25b63ace194df6973d1abc273))
+
 ## [0.2.0](https://github.com/raw-labs/openclaw-connections/compare/v0.1.1...v0.2.0) (2026-10-12)
 
 

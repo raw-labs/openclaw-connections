@@ -13,6 +13,7 @@ await test("compatibility admits the exact source host label and qualification v
       archiveSha256: z.string().regex(/^[a-f0-9]{64}$/),
       builtAt: z.string(),
       pnpmVersion: z.string(),
+      buildProfile: z.literal("ciArtifacts"),
       compatibleVersions: z.array(z.string()),
     })
     .parse(

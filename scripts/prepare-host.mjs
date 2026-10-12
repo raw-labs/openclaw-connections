@@ -93,6 +93,8 @@ if (!ready) {
   );
   assert.equal(upstream.version, pin.version);
   assert.ok(upstream.packageManager.startsWith(`pnpm@${pin.pnpmVersion}+`));
+  // A previous full build must not supply leftover application declarations.
+  await rm(resolve(host, "dist"), { recursive: true, force: true });
   await run("npm", [
     "exec",
     "--yes",
@@ -108,7 +110,7 @@ if (!ready) {
     `--package=pnpm@${pin.pnpmVersion}`,
     "--",
     "pnpm",
-    "build:package",
+    "build:ci-artifacts",
   ]);
   await assertHostBuild(host, pin);
   await writeFile(marker, JSON.stringify(pin));
