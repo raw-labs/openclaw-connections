@@ -15,7 +15,16 @@ compatibility; consumers pin an exact version. The first release is `0.1.0`.
 On main, Release Please opens or updates a release PR with the version and changelog.
 Its workflow explicitly dispatches CI on that PR's branch: PRs created by
 `GITHUB_TOKEN` otherwise do not trigger PR workflows. Review and merge the release PR
-only after its `verify` check passes. The release workflow then creates `vVERSION`
+only after its `verify` check passes. If `verify` is missing or a bot-created run
+reports `action_required`, dispatch CI on the release PR's exact head branch:
+
+```sh
+gh workflow run ci.yml --repo raw-labs/openclaw-connections --ref RELEASE_PR_HEAD
+```
+
+Replace `RELEASE_PR_HEAD` with the head branch shown on the release PR. Wait for
+that commit's `verify` check before merging; do not weaken branch protection.
+The release workflow then creates `vVERSION`
 and the GitHub Release, checks the tagged source again, builds and inspects the tarball,
 publishes that same tarball to GitHub Packages, verifies private visibility and its
 repository link, compares a registry download with the tarball, and attaches it to the Release.
