@@ -10,7 +10,13 @@ runs:
         cache: pnpm
     - run: pnpm install --frozen-lockfile
       shell: bash
-    - run: pnpm prepare:host
+    # Upstream's uncapped VM default is a 12 GiB V8 heap. Its measured 5 GiB
+    # build profile uses 4352 MiB, leaving room for native compiler/runner work.
+    - run: |
+        free -m
+        pnpm prepare:host
       shell: bash
+      env:
+        OPENCLAW_TSDOWN_MAX_OLD_SPACE_MB: "4352"
     - run: pnpm exec playwright install --with-deps chromium
       shell: bash

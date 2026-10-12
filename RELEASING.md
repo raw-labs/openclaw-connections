@@ -98,6 +98,9 @@ compatibility range. Keep source pin/checksum, SDK dependency labels, peer/API r
 minimum version, build declarations, notices and lockfile aligned when upgrading.
 
 Every CI and publication job runs `pnpm prepare:host` and asserts the built revision.
+The Linux jobs use upstream's `OPENCLAW_TSDOWN_MAX_OLD_SPACE_MB=4352` build setting
+to bound the SDK compiler heap and leave memory for native compiler children and
+the runner. The complete source host and declarations are still built.
 A version-only test is insufficient for this source target. Connections 0.2.1 is the
 patch correcting the 0.2.0 gate; publication still uses only workflow tokens.
 
