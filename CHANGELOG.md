@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/raw-labs/openclaw-connections/compare/v0.1.1...v0.2.0) (2026-10-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* Requires OpenClaw 2026.10.2 and starts with fresh native state. Existing custom SQLite records are neither imported nor deleted; this cutover is intended for fresh/test installations.
+
+### Features
+
+* use native retained plugin state ([bc1e777](https://github.com/raw-labs/openclaw-connections/commit/bc1e777989603779714f4944af14dc36801f1b68))
+
 ## [0.1.1](https://github.com/raw-labs/openclaw-connections/compare/v0.1.0...v0.1.1) (2026-10-10)
 
 
