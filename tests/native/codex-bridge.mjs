@@ -5,6 +5,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 import { z } from "zod";
+import { stateRuntime } from "../helpers/state.mjs";
 import { getToolPluginMetadata } from "openclaw/plugin-sdk/tool-plugin";
 const [entryPath, connectionId, generationText] = process.argv.slice(2);
 assert.ok(entryPath && connectionId && generationText);
@@ -74,7 +75,7 @@ const api = new Proxy(
     },
     config: {},
     runtime: {
-      state: { resolveStateDir: () => process.env.OPENCLAW_STATE_DIR },
+      state: stateRuntime(process.env.OPENCLAW_STATE_DIR),
     },
     registerTool(factory, options) {
       assert.equal(typeof factory, "function");

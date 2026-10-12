@@ -8,7 +8,8 @@ import { managementOutputs, type Receipt } from "../src/contracts.js";
 import { ComposioCatalog, packagedCatalog } from "../src/catalog.js";
 import { ComposioHttp } from "../src/providers/composio/http.js";
 import { ConnectionsService } from "../src/service.js";
-import { ConnectionStore } from "../src/store.js";
+import { ConnectionStore, type StateRuntime } from "../src/store.js";
+import { stateRuntime } from "./helpers/state.mjs";
 import {
   ConnectorProviderError,
   type ConnectorProvider,
@@ -24,11 +25,20 @@ class Provider implements ConnectorProvider {
   setups = 0;
   failDelete = false;
   unknownSetup = false;
+  unknownAuthConfiguration = false;
+  authConfigurations = 0;
   unknownExecution = false;
   sentArguments: unknown;
   onExecute: (() => Promise<void>) | undefined;
   onInspect: (() => void) | undefined;
   async resolveAuthConfiguration() {
+    this.authConfigurations++;
+    if (this.unknownAuthConfiguration)
+      throw new ConnectorProviderError(
+        "connector_provider_unknown_outcome",
+        "Auth configuration outcome unknown.",
+        "outcome_unknown",
+      );
     return {
       id: "ac_github",
       toolkit: "github",
@@ -83,9 +93,15 @@ class Provider implements ConnectorProvider {
     };
   }
 }
-function fixture(path = ":memory:") {
+async function fixture(
+  transform: (state: StateRuntime) => StateRuntime = (state) => state,
+) {
+  const directory = await mkdtemp(join(tmpdir(), "connections-service-"));
   const provider = new Provider();
-  const store = new ConnectionStore(path, "local-user");
+  const store = await ConnectionStore.open(
+    transform(stateRuntime(directory)),
+    "local-user",
+  );
   const http = new ComposioHttp({
     apiKey: "synthetic-provider-key",
     fetchImpl: async (url) => {
@@ -148,6 +164,12 @@ function fixture(path = ":memory:") {
     return { connected, started };
   }
   return {
+    async close() {
+      await service.close();
+      await rm(directory, { recursive: true, force: true });
+    },
+    reopen: () =>
+      ConnectionStore.open(transform(stateRuntime(directory)), "local-user"),
     service,
     store,
     provider,
@@ -173,7 +195,7 @@ const execute = (connectionId: string, generation: number) => ({
 });
 
 await test("setup requires the originating administrator, browser ticket and active exact account", async () => {
-  const f = fixture();
+  const f = await fixture();
   try {
     const created = managementOutputs.create.parse(
       await f.manage("create", {
@@ -198,7 +220,7 @@ await test("setup requires the originating administrator, browser ticket and act
     );
     f.provider.active = false;
     await assert.rejects(f.manage("complete", input), /not complete/);
-    assert.equal(f.store.get(created.id).state, "not_connected");
+    assert.equal((await f.store.get(created.id)).state, "not_connected");
     f.provider.active = true;
     const linked = managementOutputs.complete.parse(
       await f.manage("complete", input),
@@ -210,11 +232,11 @@ await test("setup requires the originating administrator, browser ticket and act
       /ticketHash|local-user|ca_1/,
     );
   } finally {
-    await f.service.close();
+    await f.close();
   }
 });
 await test("revoked authority cannot activate after provider inspection", async () => {
-  const f = fixture();
+  const f = await fixture();
   try {
     const created = managementOutputs.create.parse(
       await f.manage("create", {
@@ -236,13 +258,13 @@ await test("revoked authority cannot activate after provider inspection", async 
       }),
       /revoked/,
     );
-    assert.equal(f.store.get(created.id).state, "not_connected");
+    assert.equal((await f.store.get(created.id)).state, "not_connected");
   } finally {
-    await f.service.close();
+    await f.close();
   }
 });
 await test("unknown setup is durable and start never blindly allocates another account", async () => {
-  const f = fixture();
+  const f = await fixture();
   try {
     const created = managementOutputs.create.parse(
       await f.manage("create", {
@@ -256,7 +278,7 @@ await test("unknown setup is durable and start never blindly allocates another a
       f.manage("start", { connectionId: created.id, revision: 0 }),
       /unknown/,
     );
-    const item = f.store.get(created.id);
+    const item = await f.store.get(created.id);
     assert.equal(item.setup?.state, "unknown");
     assert.match(item.failure?.detail ?? "", /unknown/);
     await assert.rejects(
@@ -265,11 +287,41 @@ await test("unknown setup is durable and start never blindly allocates another a
     );
     assert.equal(f.provider.setups, 1);
   } finally {
-    await f.service.close();
+    await f.close();
+  }
+});
+await test("unknown setup preparation remains unknown and cannot allocate another auth configuration", async () => {
+  const f = await fixture();
+  try {
+    const created = managementOutputs.create.parse(
+      await f.manage("create", {
+        connectorId: "github",
+        name: "Work",
+        grant: { mode: "all" },
+      }),
+    );
+    f.provider.unknownAuthConfiguration = true;
+    await assert.rejects(
+      f.manage("start", {
+        connectionId: created.id,
+        revision: created.revision,
+      }),
+      /outcome unknown/,
+    );
+    const saved = await f.store.get(created.id);
+    assert.equal(saved.setup?.state, "unknown");
+    await assert.rejects(
+      f.manage("start", { connectionId: saved.id, revision: saved.revision }),
+      /already exists/,
+    );
+    assert.equal(f.provider.authConfigurations, 1);
+    assert.equal(f.provider.setups, 0);
+  } finally {
+    await f.close();
   }
 });
 await test("native agent grants apply to search, describe, execute and saved-result reads", async () => {
-  const f = fixture();
+  const f = await fixture();
   try {
     const { connected } = await f.linked();
     const result = await f.service.call(
@@ -278,7 +330,7 @@ await test("native agent grants apply to search, describe, execute and saved-res
     );
     await f.manage("update", {
       connectionId: connected.id,
-      revision: f.store.get(connected.id).revision,
+      revision: (await f.store.get(connected.id)).revision,
       name: "Work",
       grant: { mode: "selected", agentIds: ["researcher"] },
     });
@@ -315,11 +367,11 @@ await test("native agent grants apply to search, describe, execute and saved-res
     );
     assert.equal(f.provider.executions, 1);
   } finally {
-    await f.service.close();
+    await f.close();
   }
 });
 await test("search matches separate account/action terms without choosing another account", async () => {
-  const f = fixture();
+  const f = await fixture();
   try {
     const { connected } = await f.linked();
     const found = await f.service.search(
@@ -335,11 +387,11 @@ await test("search matches separate account/action terms without choosing anothe
       0,
     );
   } finally {
-    await f.service.close();
+    await f.close();
   }
 });
 await test("exact generation/version and native session are mandatory; schemas remain advisory", async () => {
-  const f = fixture();
+  const f = await fixture();
   try {
     const { connected } = await f.linked();
     await assert.rejects(
@@ -367,11 +419,11 @@ await test("exact generation/version and native session are mandatory; schemas r
     });
     assert.equal(f.provider.executions, 1);
   } finally {
-    await f.service.close();
+    await f.close();
   }
 });
 await test("lost execute response remains unknown and duplicate call identity never replays", async () => {
-  const f = fixture();
+  const f = await fixture();
   try {
     const { connected } = await f.linked();
     f.provider.unknownExecution = true;
@@ -399,11 +451,11 @@ await test("lost execute response remains unknown and duplicate call identity ne
       /No retained call/,
     );
   } finally {
-    await f.service.close();
+    await f.close();
   }
 });
 await test("complete large Unicode JSON is paged without another provider execution", async () => {
-  const f = fixture();
+  const f = await fixture();
   try {
     const { connected } = await f.linked();
     const result = await f.service.call(
@@ -426,22 +478,22 @@ await test("complete large Unicode JSON is paged without another provider execut
     assert.deepEqual(JSON.parse(text), { text: "𝄞 response ".repeat(10_000) });
     assert.equal(f.provider.executions, 1);
   } finally {
-    await f.service.close();
+    await f.close();
   }
 });
 await test("disconnect disables locally even when provider cleanup is uncertain", async () => {
-  const f = fixture();
+  const f = await fixture();
   try {
     const { connected } = await f.linked();
     f.provider.failDelete = true;
     await assert.rejects(
       f.manage("disconnect", {
         connectionId: connected.id,
-        revision: f.store.get(connected.id).revision,
+        revision: (await f.store.get(connected.id)).revision,
       }),
       /unknown/,
     );
-    assert.equal(f.store.get(connected.id).state, "needs_attention");
+    assert.equal((await f.store.get(connected.id)).state, "needs_attention");
     await assert.rejects(
       f.service.call(execute(connected.id, connected.generation), context),
       /unavailable/,
@@ -449,20 +501,20 @@ await test("disconnect disables locally even when provider cleanup is uncertain"
     f.provider.failDelete = false;
     await f.manage("disconnect", {
       connectionId: connected.id,
-      revision: f.store.get(connected.id).revision,
+      revision: (await f.store.get(connected.id)).revision,
     });
-    assert.equal(f.store.get(connected.id).binding, null);
+    assert.equal((await f.store.get(connected.id)).binding, null);
     await f.manage("disconnect", {
       connectionId: connected.id,
-      revision: f.store.get(connected.id).revision,
+      revision: (await f.store.get(connected.id)).revision,
     });
-    assert.equal(f.store.list().length, 0);
+    assert.equal((await f.store.list()).length, 0);
   } finally {
-    await f.service.close();
+    await f.close();
   }
 });
 await test("conflicting grant changes serialize behind admitted execution", async () => {
-  const f = fixture();
+  const f = await fixture();
   try {
     const { connected } = await f.linked();
     let release: () => void = () => {};
@@ -488,11 +540,11 @@ await test("conflicting grant changes serialize behind admitted execution", asyn
       name: "Restricted",
       grant: { mode: "selected", agentIds: [] },
     });
-    assert.equal(f.store.get(connected.id).name, "GitHub");
+    assert.equal((await f.store.get(connected.id)).name, "GitHub");
     release();
     await execution;
     await edit;
-    assert.equal(f.store.get(connected.id).name, "Restricted");
+    assert.equal((await f.store.get(connected.id)).name, "Restricted");
     await assert.rejects(
       f.service.call(execute(connected.id, connected.generation), {
         ...context,
@@ -501,7 +553,7 @@ await test("conflicting grant changes serialize behind admitted execution", asyn
       /unavailable/,
     );
   } finally {
-    await f.service.close();
+    await f.close();
   }
 });
 await test("separate Gateway stores generate independent identities and retain them across restart", async () => {
@@ -509,21 +561,21 @@ await test("separate Gateway stores generate independent identities and retain t
     join(tmpdir(), "openclaw-connections-identities-"),
   );
   try {
-    const firstPath = join(directory, "first", "connections.sqlite");
-    const first = new ConnectionStore(firstPath);
-    const second = new ConnectionStore(
-      join(directory, "second", "connections.sqlite"),
+    const firstPath = join(directory, "first");
+    const first = await ConnectionStore.open(stateRuntime(firstPath));
+    const second = await ConnectionStore.open(
+      stateRuntime(join(directory, "second")),
     );
     const firstId = first.userId;
     assert.match(firstId, /^openclaw-/);
     assert.notEqual(firstId, second.userId);
-    first.close();
-    second.close();
-    const restarted = new ConnectionStore(firstPath);
+    await first.close();
+    await second.close();
+    const restarted = await ConnectionStore.open(stateRuntime(firstPath));
     assert.equal(restarted.userId, firstId);
-    restarted.close();
-    assert.throws(
-      () => new ConnectionStore(firstPath, "different-identity"),
+    await restarted.close();
+    await assert.rejects(
+      () => ConnectionStore.open(stateRuntime(firstPath), "different-identity"),
       /retained identity/,
     );
   } finally {
@@ -534,9 +586,9 @@ await test("restart marks interrupted dispatch and setup unknown and retains ide
   const directory = await mkdtemp(
     join(tmpdir(), "openclaw-connections-store-"),
   );
-  const path = join(directory, "state.sqlite");
+  const path = directory;
   try {
-    const store = new ConnectionStore(path, "owner");
+    const store = await ConnectionStore.open(stateRuntime(path), "owner");
     const receipt: Receipt = {
       id: randomUUID(),
       connectionId: randomUUID(),
@@ -554,8 +606,8 @@ await test("restart marks interrupted dispatch and setup unknown and retains ide
       failure: null,
       result: null,
     };
-    store.claim(receipt);
-    store.insert({
+    await store.claim(receipt);
+    await store.insert({
       id: receipt.connectionId,
       connectorId: "github",
       name: "Work",
@@ -576,22 +628,30 @@ await test("restart marks interrupted dispatch and setup unknown and retains ide
         failure: null,
       },
     });
-    store.close();
-    const restarted = new ConnectionStore(path);
+    await store.close();
+    const restarted = await ConnectionStore.open(stateRuntime(path));
     assert.equal(restarted.userId, "owner");
-    assert.equal(restarted.lookup("main", "session", "call").state, "unknown");
-    const interrupted = restarted.get(receipt.connectionId);
+    assert.equal(
+      (await restarted.lookup("main", "session", "call")).state,
+      "unknown",
+    );
+    const interrupted = await restarted.get(receipt.connectionId);
     assert.equal(interrupted.setup?.state, "unknown");
     assert.equal(interrupted.state, "needs_attention");
     assert.match(interrupted.failure?.detail ?? "", /stopped during setup/);
-    restarted.close();
-    assert.throws(() => new ConnectionStore(path, "other"), /differs/);
+    await restarted.close();
+    await assert.rejects(
+      () => ConnectionStore.open(stateRuntime(path), "other"),
+      /differs/,
+    );
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
 });
 await test("expired results are pruned but their call identities still block replay", async () => {
-  const store = new ConnectionStore(":memory:");
+  const directory = await mkdtemp(join(tmpdir(), "connections-prune-"));
+  const runtime = stateRuntime(directory);
+  const store = await ConnectionStore.open(runtime);
   try {
     const expired: Receipt = {
       id: randomUUID(),
@@ -610,20 +670,9 @@ await test("expired results are pruned but their call identities still block rep
       failure: null,
       result: '"sensitive historical data"',
     };
-    store.db
-      .prepare(
-        "INSERT INTO receipts(id,agent,session,call,expires,payload) VALUES(?,?,?,?,?,?)",
-      )
-      .run(
-        expired.id,
-        expired.agentId,
-        expired.session,
-        expired.toolCallId,
-        expired.expiresAt,
-        JSON.stringify(expired),
-      );
-    store.prune();
-    assert.throws(
+    await store.claim(expired);
+    await store.prune();
+    await assert.rejects(
       () =>
         store.claim({
           ...expired,
@@ -633,11 +682,336 @@ await test("expired results are pruned but their call identities still block rep
       /No operation was replayed/,
     );
     assert.doesNotMatch(
-      JSON.stringify(store.db.prepare("SELECT payload FROM receipts").all()),
+      JSON.stringify(
+        await runtime
+          .openKeyedStore({
+            namespace: "connections.receipts.v1",
+            retention: "retained",
+          })
+          .entries(),
+      ),
       /sensitive historical data/,
     );
-    assert.equal(store.usage().calls, 0);
+    assert.equal((await store.usage()).calls, 0);
   } finally {
-    store.close();
+    await store.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+function durableReceipt(overrides: Partial<Receipt> = {}): Receipt {
+  return {
+    id: randomUUID(),
+    connectionId: randomUUID(),
+    generation: 1,
+    agentId: "main",
+    session: "session",
+    toolCallId: "call",
+    requestHash: "hash",
+    actionId: "ACTION",
+    version: "v1",
+    state: "dispatching",
+    createdAt: new Date().toISOString(),
+    completedAt: null,
+    expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+    failure: null,
+    result: null,
+    ...overrides,
+  };
+}
+await test("real retained SDK atomically races claims and connection revisions across handles", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "connections-cas-"));
+  const runtime = stateRuntime(directory);
+  const first = await ConnectionStore.open(runtime, "owner");
+  const second = await ConnectionStore.open(runtime, "owner");
+  try {
+    const receipt = durableReceipt();
+    const claims = await Promise.all(
+      Array.from({ length: 16 }, (_, i) =>
+        (i % 2 ? first : second).claim({ ...receipt, id: randomUUID() }),
+      ),
+    );
+    assert.equal(new Set(claims.map((claim) => claim.id)).size, 1);
+    const item = {
+      id: receipt.connectionId,
+      connectorId: "github",
+      name: "Work",
+      grant: { mode: "all" as const },
+      generation: 0,
+      revision: 0,
+      state: "not_connected" as const,
+      binding: null,
+      setup: null,
+      failure: null,
+    };
+    await first.insert(item);
+    const writes = await Promise.allSettled([
+      first.save({ ...item, name: "First" }),
+      second.save({ ...item, name: "Second" }),
+    ]);
+    assert.equal(
+      writes.filter((write) => write.status === "fulfilled").length,
+      1,
+    );
+    const rejected = writes.find((write) => write.status === "rejected");
+    assert.ok(rejected && rejected.status === "rejected");
+    assert.match(String(rejected.reason), /changed/);
+    assert.equal((await first.get(item.id)).revision, 1);
+    await assert.rejects(() => second.remove(item.id, 0), /changed/);
+    // A sibling connection edit retries only a pure decision and is not lost.
+    await Promise.all([
+      first.insert({ ...item, id: randomUUID() }),
+      second.insert({ ...item, id: randomUUID() }),
+    ]);
+    assert.equal((await first.list()).length, 3);
+    const winner = claims[0];
+    assert.ok(winner);
+    await first.saveReceipt({
+      ...winner,
+      state: "succeeded",
+      result: '"saved"',
+    });
+    await first.close();
+    await second.close();
+    const reopened = await ConnectionStore.open(runtime);
+    assert.equal(
+      (await reopened.lookup("main", "session", "call")).state,
+      "succeeded",
+    );
+    assert.equal(
+      (await reopened.lookup("main", "session", "call")).result,
+      '"saved"',
+    );
+    await assert.rejects(
+      () => reopened.saveReceipt({ ...winner, state: "unknown" }),
+      /already been recorded/,
+    );
+    await reopened.close();
+  } finally {
+    await first.close();
+    await second.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+await test("runtime plugin namespaces and exact agent/session tuples isolate retained receipts", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "connections-isolation-"));
+  const first = await ConnectionStore.open(
+    stateRuntime(directory, "plugin-a"),
+    "user-a",
+  );
+  const other = await ConnectionStore.open(
+    stateRuntime(directory, "plugin-b"),
+    "user-b",
+  );
+  try {
+    const receipt = durableReceipt();
+    await first.claim(receipt);
+    await assert.rejects(
+      () => other.lookup("main", "session", "call"),
+      /No retained call/,
+    );
+    await assert.rejects(
+      () => first.receipt(receipt.id, "another-agent", "session"),
+      /unavailable/,
+    );
+    const anotherAgent = await first.claim({
+      ...receipt,
+      id: randomUUID(),
+      agentId: "another-agent",
+    });
+    const anotherSession = await first.claim({
+      ...receipt,
+      id: randomUUID(),
+      session: "another-session",
+    });
+    assert.notEqual(anotherAgent.id, receipt.id);
+    assert.notEqual(anotherSession.id, receipt.id);
+    // Tuple boundaries cannot alias even when native IDs contain delimiters.
+    const one = await first.claim({
+      ...receipt,
+      id: randomUUID(),
+      agentId: "a:b",
+      session: "c",
+    });
+    const two = await first.claim({
+      ...receipt,
+      id: randomUUID(),
+      agentId: "a",
+      session: "b:c",
+    });
+    assert.notEqual(one.id, two.id);
+    assert.equal(other.userId, "user-b");
+    await assert.rejects(
+      () => ConnectionStore.open(stateRuntime(directory, "plugin-a"), "user-b"),
+      /differs/,
+    );
+  } finally {
+    await first.close();
+    await other.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+await test("pruning over multiple pages keeps unknown outcomes and permanent deduplication", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "connections-pages-"));
+  const runtime = stateRuntime(directory);
+  const store = await ConnectionStore.open(runtime);
+  try {
+    for (let i = 0; i < 140; i++)
+      await store.claim(
+        durableReceipt({
+          toolCallId: `call-${i}`,
+          state: "unknown",
+          result: '"sensitive"',
+          expiresAt: "2020-01-01T00:00:00Z",
+        }),
+      );
+    await store.prune();
+    const values = await runtime
+      .openKeyedStore({
+        namespace: "connections.receipts.v1",
+        retention: "retained",
+      })
+      .entries();
+    assert.equal(values.length, 140);
+    assert.doesNotMatch(JSON.stringify(values), /sensitive/);
+    assert.match(JSON.stringify(values), /outcome remains unknown/);
+    await store.close();
+    const reopened = await ConnectionStore.open(runtime);
+    await assert.rejects(
+      () => reopened.claim(durableReceipt({ toolCallId: "call-139" })),
+      /No operation was replayed/,
+    );
+    await reopened.close();
+  } finally {
+    await store.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+await test("missing CAS and failed state reads stop without a storage fallback", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "connections-fail-closed-"));
+  const runtime = stateRuntime(directory);
+  try {
+    const unsupported: StateRuntime = {
+      openKeyedStore<T>(
+        options: Parameters<StateRuntime["openKeyedStore"]>[0],
+      ) {
+        const { observe: _observe, ...rest } =
+          runtime.openKeyedStore<T>(options);
+        return rest;
+      },
+    };
+    await assert.rejects(
+      () => ConnectionStore.open(unsupported),
+      /requires retained/,
+    );
+    assert.equal(
+      await runtime
+        .openKeyedStore({
+          namespace: "connections.identity.v1",
+          retention: "retained",
+        })
+        .lookup("identity"),
+      undefined,
+    );
+    const error = new Error("Synthetic storage read failure");
+    let reads = 0;
+    const failing: StateRuntime = {
+      openKeyedStore<T>(
+        options: Parameters<StateRuntime["openKeyedStore"]>[0],
+      ) {
+        const store = runtime.openKeyedStore<T>(options);
+        return {
+          ...store,
+          lookup: async () => {
+            reads++;
+            throw error;
+          },
+        };
+      },
+    };
+    await assert.rejects(
+      () => ConnectionStore.open(failing),
+      (failure) => failure === error,
+    );
+    assert.equal(reads, 1);
+    // Invalid authoritative data must fail, never become an empty registry.
+    await runtime
+      .openKeyedStore({
+        namespace: "connections.registry.v1",
+        retention: "retained",
+      })
+      .register("registry", { malformed: true });
+    await assert.rejects(() => ConnectionStore.open(runtime));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+await test("failed dispatch claims prevent provider effects and failed outcome writes recover unknown", async () => {
+  let failClaim = false;
+  let failOutcome = false;
+  const error = new Error("Synthetic retained write failure");
+  const f = await fixture((runtime) => ({
+    openKeyedStore<T>(options: Parameters<StateRuntime["openKeyedStore"]>[0]) {
+      const store = runtime.openKeyedStore<T>(options);
+      if (options.namespace !== "connections.receipts.v1") return store;
+      const compare = store.compareAndApply;
+      assert.ok(compare);
+      const adapted: typeof store = {
+        ...store,
+        registerIfAbsent: async (key, value, opts) => {
+          if (failClaim) throw error;
+          return store.registerIfAbsent(key, value, opts);
+        },
+        compareAndApply: async (key, observation, intent) => {
+          if (failOutcome) throw error;
+          return compare(key, observation, intent);
+        },
+      };
+      return adapted;
+    },
+  }));
+  try {
+    const { connected } = await f.linked();
+    failClaim = true;
+    await assert.rejects(
+      () =>
+        f.service.call(execute(connected.id, connected.generation), context),
+      (failure) => failure === error,
+    );
+    assert.equal(f.provider.executions, 0);
+    failClaim = false;
+    failOutcome = true;
+    await assert.rejects(
+      () =>
+        f.service.call(execute(connected.id, connected.generation), context),
+      (failure) => failure === error,
+    );
+    assert.equal(f.provider.executions, 1);
+    failOutcome = false;
+    const saved = await f.store.lookup(
+      context.agentId,
+      context.sessionKey,
+      context.toolCallId,
+    );
+    assert.equal(saved.state, "dispatching");
+    // A failed write is not retried or turned into a fabricated successful receipt.
+    await f.service.call(execute(connected.id, connected.generation), context);
+    assert.equal(f.provider.executions, 1);
+    await f.service.close();
+    const reopened = await f.reopen();
+    assert.equal(
+      (
+        await reopened.lookup(
+          context.agentId,
+          context.sessionKey,
+          context.toolCallId,
+        )
+      ).state,
+      "unknown",
+    );
+    await reopened.close();
+  } finally {
+    await f.close();
   }
 });

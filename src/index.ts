@@ -1,6 +1,6 @@
-import { join } from "node:path";
 import { Type } from "typebox";
 import { defineToolPlugin } from "openclaw/plugin-sdk/tool-plugin";
+import { listAgentIds } from "openclaw/plugin-sdk/agent-scope-runtime";
 import { assertPluginCapabilitySecretAvailable } from "openclaw/plugin-sdk/secret-input-runtime";
 import type {
   OpenClawPluginApi,
@@ -19,7 +19,12 @@ import { createComposioProvider } from "./providers/composio/provider.js";
 
 const holders = new WeakMap<
   OpenClawPluginApi,
-  { service?: ConnectionsService; configured: boolean; referenced: boolean }
+  {
+    service?: ConnectionsService;
+    configured: boolean;
+    referenced: boolean;
+    startupFailure?: ConnectionError;
+  }
 >();
 const secretOwner = "plugins.entries.openclaw-connections.config.apiKey";
 function assertCredentialAvailable(api: OpenClawPluginApi) {
@@ -89,7 +94,9 @@ const callParameters = Type.Union([
 ]);
 function runtime(api: OpenClawPluginApi) {
   assertCredentialAvailable(api);
-  const service = holders.get(api)?.service;
+  const holder = holders.get(api);
+  if (holder?.startupFailure) throw holder.startupFailure;
+  const service = holder?.service;
   if (!service)
     throw new ConnectionError(
       "not_configured",
@@ -236,6 +243,7 @@ plugin.register = (api) => {
   const apiKey = typeof config.apiKey === "string" ? config.apiKey : undefined;
   const holder: {
     service?: ConnectionsService;
+    startupFailure?: ConnectionError;
     configured: boolean;
     referenced: boolean;
   } = {
@@ -246,17 +254,23 @@ plugin.register = (api) => {
   registerTools(api);
   api.registerService({
     id: "openclaw-connections",
-    start() {
+    async start() {
       if (!apiKey) return;
       assertCredentialAvailable(api);
-      const store = new ConnectionStore(
-        join(
-          api.runtime.state.resolveStateDir(),
-          "connections",
-          "connections.sqlite",
-        ),
-        config.userId,
-      );
+      let store: ConnectionStore;
+      try {
+        store = await ConnectionStore.open(api.runtime.state, config.userId);
+        delete holder.startupFailure;
+      } catch (error) {
+        holder.startupFailure =
+          error instanceof ConnectionError
+            ? error
+            : new ConnectionError(
+                "state_unavailable",
+                "Connections durable state could not be opened. Check the Gateway's state access and plugin trust diagnostics, then restart the Gateway.",
+              );
+        throw error;
+      }
       holder.service = new ConnectionsService(
         store,
         createComposioProvider({ apiKey }),
@@ -325,11 +339,7 @@ plugin.register = (api) => {
                 "native_context_unavailable",
                 "A native administrator identity or device is required.",
               );
-            const configuredAgents =
-              api.config.agents?.list?.map((agent) => agent.id) ?? [];
-            const agents = configuredAgents.length
-              ? configuredAgents
-              : ["main"];
+            const agents = listAgentIds(api.config);
             result = await runtime(api).manage(
               name,
               params,
@@ -338,6 +348,7 @@ plugin.register = (api) => {
               current,
             );
           }
+          current();
           respond(true, managementOutputs[name].parse(result));
         } catch (error) {
           const safe =

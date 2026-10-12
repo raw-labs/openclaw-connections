@@ -71,7 +71,7 @@ export class ConnectionsService {
   }
   async close() {
     await this.tail;
-    this.store.close();
+    await this.store.close();
   }
   manage(
     method: ManagementMethod,
@@ -83,8 +83,9 @@ export class ConnectionsService {
     return this.serial(async () => {
       current();
       const signal = signalFor();
-      const get = (id: string, revision?: number) => {
-        const item = this.store.get(id);
+      const get = async (id: string, revision?: number) => {
+        const item = await this.store.get(id);
+        current();
         if (revision !== undefined && item.revision !== revision)
           throw new ConnectionError(
             "revision_conflict",
@@ -109,7 +110,7 @@ export class ConnectionsService {
         case "list": {
           managementInputs.list.parse(raw);
           return {
-            items: this.store.list().map(publicConnection),
+            items: (await this.store.list()).map(publicConnection),
             nextCursor: null,
           };
         }
@@ -136,23 +137,26 @@ export class ConnectionsService {
             setup: null,
             failure: null,
           };
-          this.store.insert(item);
+          await this.store.insert(item, current);
           return publicConnection(item);
         }
         case "update": {
           const input = managementInputs.update.parse(raw);
           validGrant(input.grant);
           return publicConnection(
-            this.store.save({
-              ...get(input.connectionId, input.revision),
-              name: input.name,
-              grant: input.grant,
-            }),
+            await this.store.save(
+              {
+                ...(await get(input.connectionId, input.revision)),
+                name: input.name,
+                grant: input.grant,
+              },
+              current,
+            ),
           );
         }
         case "start": {
           const input = managementInputs.start.parse(raw);
-          let item = get(input.connectionId, input.revision);
+          let item = await get(input.connectionId, input.revision);
           if (
             item.setup &&
             ["creating", "pending", "unknown"].includes(item.setup.state)
@@ -164,32 +168,37 @@ export class ConnectionsService {
           const connector = this.catalog.connector(item.connectorId);
           const ticket = randomBytes(32).toString("base64url");
           // Disable execution and retire the old generation before touching Composio.
-          item = this.store.save({
-            ...item,
-            state: "not_connected",
-            generation: item.generation + 1,
-            failure: null,
-            setup: {
-              id: randomUUID(),
-              state: "creating",
-              actor,
-              ticketHash: digest(ticket),
-              binding: null,
-              url: null,
-              expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+          item = await this.store.save(
+            {
+              ...item,
+              state: "not_connected",
+              generation: item.generation + 1,
               failure: null,
+              setup: {
+                id: randomUUID(),
+                state: "creating",
+                actor,
+                ticketHash: digest(ticket),
+                binding: null,
+                url: null,
+                expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+                failure: null,
+              },
             },
-          });
+            current,
+          );
           const setup = item.setup;
           if (!setup)
             throw new ConnectionError(
               "invalid_setup",
               "The setup is unavailable.",
             );
+          let setupDispatched = false;
           try {
             if (item.binding) {
+              current();
               await this.provider.deleteAccount(item.binding, signal);
-              item = this.store.save({ ...item, binding: null });
+              item = await this.store.save({ ...item, binding: null }, current);
             }
             let authId = this.authConfigIds[item.connectorId];
             if (!authId) {
@@ -206,6 +215,7 @@ export class ConnectionsService {
               ).id;
             }
             current();
+            setupDispatched = true;
             const result = await this.provider.createSetup(
               { authConfigurationId: authId, subjectId: this.store.userId },
               signal,
@@ -216,16 +226,19 @@ export class ConnectionsService {
               toolkit: connector.toolkitSlug,
               authConfigurationId: authId,
             };
-            item = this.store.save({
-              ...item,
-              setup: {
-                ...setup,
-                state: "pending",
-                binding,
-                url: result.connectUrl,
-                expiresAt: result.expiresAt,
+            item = await this.store.save(
+              {
+                ...item,
+                setup: {
+                  ...setup,
+                  state: "pending",
+                  binding,
+                  url: result.connectUrl,
+                  expiresAt: result.expiresAt,
+                },
               },
-            });
+              current,
+            );
             current();
             return {
               setup: publicConnection(item).setup,
@@ -235,24 +248,28 @@ export class ConnectionsService {
           } catch (error) {
             // Never silently allocate a second provider account after a lost response.
             const uncertain =
-              error instanceof ConnectorProviderError &&
-              error.completion === "outcome_unknown";
-            item = this.store.save({
-              ...item,
-              state: "needs_attention",
-              failure: { detail: failure(error).message },
-              setup: {
-                ...(item.setup ?? setup),
-                state: uncertain ? "unknown" : "cancelled",
+              error instanceof ConnectorProviderError
+                ? error.completion === "outcome_unknown"
+                : setupDispatched;
+            item = await this.store.save(
+              {
+                ...item,
+                state: "needs_attention",
                 failure: { detail: failure(error).message },
+                setup: {
+                  ...(item.setup ?? setup),
+                  state: uncertain ? "unknown" : "cancelled",
+                  failure: { detail: failure(error).message },
+                },
               },
-            });
+              current,
+            );
             throw error;
           }
         }
         case "setup": {
           const input = managementInputs.setup.parse(raw);
-          const item = get(input.connectionId);
+          const item = await get(input.connectionId);
           if (
             !item.setup ||
             item.setup.id !== input.setupId ||
@@ -269,7 +286,7 @@ export class ConnectionsService {
         }
         case "complete": {
           const input = managementInputs.complete.parse(raw);
-          const item = get(input.connectionId);
+          const item = await get(input.connectionId);
           const setup = item.setup;
           if (
             !setup ||
@@ -305,42 +322,52 @@ export class ConnectionsService {
             );
           current();
           return publicConnection(
-            this.store.save({
-              ...item,
-              state: "connected",
-              binding: setup.binding,
-              failure: null,
-              setup: { ...setup, state: "completed", url: null },
-            }),
+            await this.store.save(
+              {
+                ...item,
+                state: "connected",
+                binding: setup.binding,
+                failure: null,
+                setup: { ...setup, state: "completed", url: null },
+              },
+              current,
+            ),
           );
         }
         case "cancel": {
           const input = managementInputs.cancel.parse(raw);
-          let item = get(input.connectionId, input.revision);
+          let item = await get(input.connectionId, input.revision);
           if (!item.setup || item.setup.id !== input.setupId)
             throw new ConnectionError(
               "not_found",
               "The setup could not be found.",
             );
           const pending = item.setup.binding;
-          item = this.store.save({
-            ...item,
-            state: "disconnected",
-            setup: { ...item.setup, state: "cancelled", url: null },
-          });
+          item = await this.store.save(
+            {
+              ...item,
+              state: "disconnected",
+              setup: { ...item.setup, state: "cancelled", url: null },
+            },
+            current,
+          );
           if (pending) {
             try {
+              current();
               await this.provider.deleteAccount(pending, signal);
             } catch (error) {
-              this.store.save({
-                ...item,
-                binding: pending,
-                state: "needs_attention",
-                failure: {
-                  detail:
-                    "Access is disabled locally. Composio cleanup could not be confirmed; use Disconnect again to inspect and retry cleanup explicitly.",
+              await this.store.save(
+                {
+                  ...item,
+                  binding: pending,
+                  state: "needs_attention",
+                  failure: {
+                    detail:
+                      "Access is disabled locally. Composio cleanup could not be confirmed; use Disconnect again to inspect and retry cleanup explicitly.",
+                  },
                 },
-              });
+                current,
+              );
               throw error;
             }
           }
@@ -348,51 +375,65 @@ export class ConnectionsService {
         }
         case "disconnect": {
           const input = managementInputs.disconnect.parse(raw);
-          let item = get(input.connectionId, input.revision);
+          let item = await get(input.connectionId, input.revision);
           const bindings = [item.binding, item.setup?.binding].filter(
             (v) => v !== null && v !== undefined,
           );
-          item = this.store.save({
-            ...item,
-            state: "disconnected",
-            generation: item.generation + 1,
-            setup: item.setup
-              ? { ...item.setup, state: "cancelled", url: null }
-              : null,
-          });
+          item = await this.store.save(
+            {
+              ...item,
+              state: "disconnected",
+              generation: item.generation + 1,
+              setup: item.setup
+                ? { ...item.setup, state: "cancelled", url: null }
+                : null,
+            },
+            current,
+          );
           try {
             for (const binding of new Map(
               bindings.map((b) => [b.accountId, b]),
-            ).values())
+            ).values()) {
+              current();
               await this.provider.deleteAccount(binding, signal);
+            }
           } catch (error) {
-            this.store.save({
-              ...item,
-              state: "needs_attention",
-              failure: {
-                detail:
-                  "Access is disabled locally. Composio cleanup could not be confirmed. Refresh before retrying Disconnect explicitly.",
+            await this.store.save(
+              {
+                ...item,
+                state: "needs_attention",
+                failure: {
+                  detail:
+                    "Access is disabled locally. Composio cleanup could not be confirmed. Refresh before retrying Disconnect explicitly.",
+                },
               },
-            });
+              current,
+            );
             throw error;
           }
           if (!bindings.length) {
-            this.store.remove(item.id, item.revision);
+            await this.store.remove(item.id, item.revision, current);
             return { removed: true };
           }
-          this.store.save({
-            ...item,
-            binding: null,
-            setup: null,
-            failure: null,
-          });
+          await this.store.save(
+            {
+              ...item,
+              binding: null,
+              setup: null,
+              failure: null,
+            },
+            current,
+          );
           return { removed: false };
         }
       }
     });
   }
-  private authorized(id: string, agent: string): StoredConnection {
-    const item = this.store.get(id);
+  private async authorized(
+    id: string,
+    agent: string,
+  ): Promise<StoredConnection> {
+    const item = await this.store.get(id);
     if (
       item.state !== "connected" ||
       !item.binding ||
@@ -407,15 +448,13 @@ export class ConnectionsService {
   search(raw: unknown, context: NativeContext) {
     return this.serial(async () => {
       const input = searchInput.parse(raw);
-      const usable = this.store
-        .list()
-        .filter(
-          (item) =>
-            item.state === "connected" &&
-            item.binding &&
-            (item.grant.mode === "all" ||
-              item.grant.agentIds.includes(context.agentId)),
-        );
+      const usable = (await this.store.list()).filter(
+        (item) =>
+          item.state === "connected" &&
+          item.binding &&
+          (item.grant.mode === "all" ||
+            item.grant.agentIds.includes(context.agentId)),
+      );
       const selected = usable.filter(
         (item) =>
           (!input.connectionId || item.id === input.connectionId) &&
@@ -472,7 +511,7 @@ export class ConnectionsService {
   describe(raw: unknown, context: NativeContext) {
     return this.serial(async () => {
       const input = describeInput.parse(raw);
-      const item = this.authorized(input.connectionId, context.agentId);
+      const item = await this.authorized(input.connectionId, context.agentId);
       const action = (
         await this.catalog.actions(item.connectorId, signalFor(context.signal))
       ).find((a) => a.id === input.actionId);
@@ -493,18 +532,18 @@ export class ConnectionsService {
           "native_context_unavailable",
           "A native agent session is required.",
         );
-      this.store.prune();
+      await this.store.prune();
       if (input.mode === "lookup")
         return this.presentReceipt(
-          this.store.lookup(context.agentId, session, input.toolCallId),
+          await this.store.lookup(context.agentId, session, input.toolCallId),
         );
       if (input.mode === "result") {
-        const receipt = this.store.receipt(
+        const receipt = await this.store.receipt(
           input.invocationId,
           context.agentId,
           session,
         );
-        this.authorized(receipt.connectionId, context.agentId);
+        await this.authorized(receipt.connectionId, context.agentId);
         const result = receipt.result;
         if (result === null) return this.presentReceipt(receipt);
         const offset = Number(input.cursor ?? 0);
@@ -527,7 +566,7 @@ export class ConnectionsService {
           },
         };
       }
-      const item = this.authorized(input.connectionId, context.agentId);
+      const item = await this.authorized(input.connectionId, context.agentId);
       if (item.generation !== input.generation)
         throw new ConnectionError(
           "generation_changed",
@@ -563,7 +602,7 @@ export class ConnectionsService {
       const requestHash = digest(canonicalJson(input));
       let existing: Receipt | undefined;
       try {
-        existing = this.store.lookup(
+        existing = await this.store.lookup(
           context.agentId,
           session,
           context.toolCallId,
@@ -602,7 +641,7 @@ export class ConnectionsService {
         signalFor(context.signal),
       );
       if (!account || account.state !== "active") {
-        this.store.save({
+        await this.store.save({
           ...item,
           state: "needs_attention",
           failure: { detail: "The account needs to be reconnected." },
@@ -634,7 +673,7 @@ export class ConnectionsService {
         failure: null,
         result: null,
       };
-      const claimed = this.store.claim(receipt);
+      const claimed = await this.store.claim(receipt);
       if (claimed.id !== receipt.id) {
         if (claimed.requestHash !== requestHash)
           throw new ConnectionError(
@@ -687,7 +726,7 @@ export class ConnectionsService {
           },
         };
       }
-      this.store.saveReceipt(completed);
+      await this.store.saveReceipt(completed);
       return this.presentReceipt(completed);
     });
   }
@@ -700,8 +739,8 @@ export class ConnectionsService {
     } = receipt;
     return invocation;
   }
-  private presentReceipt(receipt: Receipt) {
-    this.authorized(receipt.connectionId, receipt.agentId);
+  private async presentReceipt(receipt: Receipt) {
+    await this.authorized(receipt.connectionId, receipt.agentId);
     const data: unknown =
       receipt.result === null ? null : JSON.parse(receipt.result);
     return {

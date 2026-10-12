@@ -70,11 +70,21 @@ Alternatively, an authenticated repository reader can download the attached tarb
 gh release download vVERSION --repo raw-labs/openclaw-connections --pattern '*.tgz'
 ```
 
-An OCE deployment can bake the pinned tarball into its Gateway image and configure
+A consuming deployment can bake the pinned tarball into its Gateway image and configure
 this native plugin. Image changes, secret bindings, persistent-volume configuration
 and replacement testing belong to the deployment repository. A plugin picker is not
 required. [State and trust](README.md#state-and-trust) describes the current storage
-contract, including the directory that deployments must persist.
+contract: Connections 0.2 uses canonical retained plugin state, with no special
+Connections mount. It pins the published OpenClaw and Codex harness `2026.10.2`
+packages, which support state access for private installed plugins. Keep SDK/peer,
+compatibility declarations, notices and lockfile aligned when upgrading.
+
+The 0.2 release is a breaking storage cutover. Existing custom SQLite state is neither
+imported nor deleted; the plugin starts with new native state. Use this release for
+fresh/test installations. Existing installations that need their records preserved
+must stay on 0.1 until a separately planned transition is available. Consumer image,
+secret configuration, persistent disk replacement and real-provider acceptance are
+separate deployment qualification; a plugin release does not deploy those consumers.
 
 References: [GitHub npm registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry),
 [Release Please action](https://github.com/googleapis/release-please-action).

@@ -24,7 +24,7 @@
     ".": "./dist/index.js"
   },
   "peerDependencies": {
-    "openclaw": "2026.9.8"
+    "openclaw": "2026.10.2"
   },
   "peerDependenciesMeta": {
     "openclaw": {
@@ -36,12 +36,12 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "@openclaw/codex": "2026.9.8",
+    "@openclaw/codex": "2026.10.2",
     "@types/jsdom": "21.1.7",
     "@types/node": "24.10.13",
     "esbuild": "0.27.4",
     "jsdom": "26.1.0",
-    "openclaw": "2026.9.8",
+    "openclaw": "2026.10.2",
     "playwright": "1.63.0",
     "prettier": "3.9.7",
     "tsx": "4.23.13",
@@ -61,12 +61,12 @@
       "./dist/index.js"
     ],
     "compat": {
-      "pluginApi": "2026.9.8",
-      "minGatewayVersion": "2026.9.8"
+      "pluginApi": "2026.10.2",
+      "minGatewayVersion": "2026.10.2"
     },
     "build": {
-      "openclawVersion": "2026.9.8",
-      "pluginSdkVersion": "2026.9.8"
+      "openclawVersion": "2026.10.2",
+      "pluginSdkVersion": "2026.10.2"
     },
     "controlUi": "./src/control-ui.ts"
   },
