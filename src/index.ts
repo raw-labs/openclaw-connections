@@ -97,10 +97,15 @@ function runtime(api: OpenClawPluginApi) {
   const holder = holders.get(api);
   if (holder?.startupFailure) throw holder.startupFailure;
   const service = holder?.service;
-  if (!service)
+  if (!holder?.configured)
     throw new ConnectionError(
       "not_configured",
       "Configure the plugin's Composio apiKey through OpenClaw Settings, then restart the Gateway.",
+    );
+  if (!service)
+    throw new ConnectionError(
+      "runtime_unavailable",
+      "Connections is configured, but its Gateway service is unavailable. Check the Gateway's plugin lifecycle diagnostics, then restart the Gateway. Do not repeat an external operation to recover an unknown outcome.",
     );
   return service;
 }

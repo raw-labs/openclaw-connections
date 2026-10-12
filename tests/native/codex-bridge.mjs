@@ -62,6 +62,31 @@ await coldMethods.get("connections.status")({
   },
 });
 await coldServices[0].stop();
+// Missing configuration remains distinct from a configured service lifetime.
+const absentMethods = new Map();
+await plugin.register({
+  pluginConfig: {},
+  registerTool(factory) {
+    assert.equal(factory({ agentId: "main" }), null);
+  },
+  registerService() {},
+  registerGatewayMethod(name, handler) {
+    absentMethods.set(name, handler);
+  },
+  config: {},
+});
+await absentMethods.get("connections.list")({
+  params: {},
+  client: {
+    connId: "admin",
+    connect: { role: "operator", scopes: ["operator.admin"] },
+  },
+  respond(ok, value, error) {
+    assert.equal(ok, false);
+    assert.equal(value, undefined);
+    assert.equal(error.details.code, "not_configured");
+  },
+});
 const factories = new Map();
 const services = [];
 const methods = new Map();
@@ -103,7 +128,38 @@ const api = new Proxy(
 await plugin.register(api);
 assert.equal(methods.size, 12);
 assert.equal(services.length, 1);
+const retainedTools = [...factories.values()].map((factory) =>
+  factory({ agentId: "main", sessionKey: "agent:main:lifecycle" }),
+);
+async function assertRuntimeUnavailable() {
+  for (const tool of retainedTools) {
+    const result = await tool.execute("lifecycle-probe", {});
+    assert.equal(result.details.ok, false);
+    assert.equal(result.details.error.code, "runtime_unavailable");
+    assert.doesNotMatch(
+      JSON.stringify(result),
+      /synthetic-never-sent|\bconfigure\b|\brotate\b/i,
+    );
+  }
+  await methods.get("connections.status")({
+    params: {},
+    client: {
+      connId: "admin",
+      connect: { role: "operator", scopes: ["operator.admin"] },
+    },
+    respond(ok, value, error) {
+      assert.equal(ok, false);
+      assert.equal(value, undefined);
+      assert.equal(error.details.code, "runtime_unavailable");
+    },
+  });
+}
+await assertRuntimeUnavailable();
 await services[0].start();
+assert.equal(
+  (await retainedTools[0].execute("started-probe", {})).details.ok,
+  true,
+);
 try {
   const folder = resolve("node_modules/@openclaw/codex/dist/.setup");
   const candidates = (await readdir(folder)).filter((name) =>
@@ -253,3 +309,31 @@ try {
 } finally {
   await services[0].stop();
 }
+await assertRuntimeUnavailable();
+// A failed durable-state start must retain its explicit, redacted failure.
+const failedTools = [],
+  failedServices = [];
+await plugin.register({
+  pluginConfig: { apiKey: process.env.COMPOSIO_API_KEY },
+  runtime: {
+    state: {
+      openKeyedStore() {
+        throw Error("synthetic-never-sent-state-detail");
+      },
+    },
+  },
+  registerTool(factory) {
+    failedTools.push(factory({ agentId: "main" }));
+  },
+  registerService(service) {
+    failedServices.push(service);
+  },
+  registerGatewayMethod() {},
+});
+await assert.rejects(failedServices[0].start());
+for (const tool of failedTools) {
+  const result = await tool.execute("failed-start-probe", {});
+  assert.equal(result.details.error.code, "state_unavailable");
+  assert.doesNotMatch(JSON.stringify(result), /synthetic-never-sent/);
+}
+await failedServices[0].stop();
