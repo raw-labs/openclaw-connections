@@ -80,6 +80,11 @@ no Connections database is opened and no provider requests are made. Fix the nat
 secret binding and restart the Gateway. A resolved key enables the capability but does
 not prove provider acceptance or account consent; those failures remain visible during use.
 Native startup rejection for secret-provider policy or contract violations still applies.
+If a configured registration has no running Gateway service, requests report
+`runtime_unavailable`, rather than missing-key guidance. Check the Gateway's plugin
+lifecycle diagnostics and restart it; re-entering or rotating the key does not resolve
+service availability. This diagnostic does not restore an unavailable service. Do not
+repeat an external operation to recover an unknown outcome.
 
 Enable custom native Control UI plugins using the pinned OpenClaw build's
 `gateway.controlUi.experimental.customPlugins` setting, and accept its native UI consent
