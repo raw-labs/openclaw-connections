@@ -45,7 +45,7 @@ jobs:
     needs: release
     if: ${{ !cancelled() && (needs.release.outputs.created == 'true' || inputs.tag != '') }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 45
     permissions:
       contents: write
       packages: write

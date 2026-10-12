@@ -1,0 +1,8 @@
+{
+  "version": "2026.9.8",
+  "commit": "90d30a1178a79dddd92e6190b66b95d89dfb3ca8",
+  "archiveSha256": "c56ea921a033efd95c2c9e43e4255c675939b0aa927c6aaf5bbdb51d5b693a8b",
+  "builtAt": "2026-10-07T22:05:23Z",
+  "pnpmVersion": "12.5.1",
+  "compatibleVersions": ["2026.9.8", "2026.10.2"]
+}

@@ -84,9 +84,17 @@ this native plugin. Image changes, secret bindings, persistent-volume configurat
 and replacement testing belong to the deployment repository. A plugin picker is not
 required. [State and trust](README.md#state-and-trust) describes the current storage
 contract: Connections 0.2 uses canonical retained plugin state, with no special
-Connections mount. It pins the published OpenClaw and Codex harness `2026.10.2`
-packages, which support state access for private installed plugins. Keep SDK/peer,
-compatibility declarations, notices and lockfile aligned when upgrading.
+Connections mount. Its primary SDK/host is the source build recorded in `openclaw-host.json`: OpenClaw
+`2026.9.8` at `90d30a1178a79dddd92e6190b66b95d89dfb3ca8`. The npm SDK and Codex
+harness dependency labels are pinned to `2026.9.8`; preparation builds and selects
+the exact source SDK before qualification. Stock published `2026.9.8` is unsupported.
+The already qualified published `2026.10.2` host remains admitted by the explicit
+compatibility range. Keep source pin/checksum, SDK dependency labels, peer/API ranges,
+minimum version, build declarations, notices and lockfile aligned when upgrading.
+
+Every CI and publication job runs `pnpm prepare:host` and asserts the built revision.
+A version-only test is insufficient for this source target. Connections 0.2.1 is the
+patch correcting the 0.2.0 gate; publication still uses only workflow tokens.
 
 The 0.2 release is a breaking storage cutover. Existing custom SQLite state is neither
 imported nor deleted; the plugin starts with new native state. Use this release for

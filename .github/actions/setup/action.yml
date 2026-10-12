@@ -10,5 +10,7 @@ runs:
         cache: pnpm
     - run: pnpm install --frozen-lockfile
       shell: bash
+    - run: pnpm prepare:host
+      shell: bash
     - run: pnpm exec playwright install --with-deps chromium
       shell: bash

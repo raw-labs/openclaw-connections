@@ -1,9 +1,11 @@
+import { assertPinnedHost } from "./pinned-host.mjs";
 import { build } from "esbuild";
 import { mkdir, readFile, writeFile, rm, copyFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { configSchema } from "../src/config.ts";
 
+await assertPinnedHost();
 await rm("dist", { recursive: true, force: true });
 await mkdir("dist/licenses", { recursive: true });
 await mkdir(".local", { recursive: true });
