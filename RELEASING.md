@@ -103,11 +103,13 @@ in the host pin. It builds the complete Gateway runtime, Control UI, metadata an
 canonical public SDK declarations, including upstream's SDK export checks. It
 does not generate unused declarations for the entire OpenClaw application.
 Previous generated host output is cleared before preparation. CI verification and
-publication use the standard `macos-15-intel` runner (14 GB RAM) with upstream's
-`OPENCLAW_TSDOWN_MAX_OLD_SPACE_MB=4352` compiler heap setting. The 8 GB Linux runner
-for private repositories does not provide reliable memory headroom for this SDK's
-declaration compiler. The plugin package contains portable JavaScript; native
-Gateway/Chromium acceptance runs on the same runner before publication.
+publication use RAW Labs' Depot Linux ARM runner `depot-ubuntu-24.04-arm-8`
+(8 CPUs, 32 GB RAM) with upstream's `OPENCLAW_TSDOWN_MAX_OLD_SPACE_MB=4352`
+compiler heap setting. Qualification measured a 9,055 MiB compiler process-tree
+peak; the V8 setting alone does not bound the native TypeScript compiler. Runner
+capacity also leaves room for Depot's disk accelerator. Release Please uses the
+smaller `depot-ubuntu-24.04-arm` runner. The plugin package contains portable
+JavaScript; native Gateway/Chromium acceptance runs before publication.
 A version-only test is insufficient for this source target. Connections 0.2.1 is the
 patch correcting the 0.2.0 gate; publication still uses only workflow tokens.
 
