@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/raw-labs/openclaw-connections/compare/v0.2.1...v0.2.2) (2026-10-12)
+
+
+### Bug Fixes
+
+* distinguish unavailable runtime from missing credentials ([#13](https://github.com/raw-labs/openclaw-connections/issues/13)) ([4ea166c](https://github.com/raw-labs/openclaw-connections/commit/4ea166c3cc9c031744020f6ad2015f1aea65dd0b))
+
 ## [0.2.1](https://github.com/raw-labs/openclaw-connections/compare/v0.2.0...v0.2.1) (2026-10-12)
 
 
