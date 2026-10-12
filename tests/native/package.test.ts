@@ -93,7 +93,9 @@ await test(
         stream?.setEncoding("utf8").on("data", (chunk: string) => {
           diagnostics = (diagnostics + chunk).slice(-16_000);
         });
-      for (let i = 0; i < 160; i++) {
+      // Cold hosted runners need time to load the complete native plugin runtime.
+      const readinessDeadline = Date.now() + 120_000;
+      while (Date.now() < readinessDeadline) {
         if (gateway.exitCode !== null)
           throw Error(`Gateway exited: ${diagnostics}`);
         try {
