@@ -190,7 +190,8 @@ of uncertain mutations in this plugin.
 
 `pnpm prepare:host` downloads the checksum-pinned upstream source under ignored
 `.local/openclaw-host/`, installs its frozen dependency graph with its pinned pnpm,
-builds the Gateway/SDK/UI and links it as this project's development SDK. It does not
+uses upstream's `build:ci-artifacts` profile to build the Gateway, Control UI and
+canonical public SDK declarations, and links that SDK for development. It does not
 change a deployment or another checkout. CI and tagged publication perform this step;
 checks assert the host's actual build commit, not just its version. The bootstrap npm
 SDK dependency is replaced for qualification; it is not evidence that stock npm

@@ -10,6 +10,7 @@ export async function readHostPin() {
   assert.match(pin.commit, /^[a-f0-9]{40}$/);
   assert.match(pin.archiveSha256, /^[a-f0-9]{64}$/);
   assert.match(pin.pnpmVersion, /^\d+\.\d+\.\d+$/);
+  assert.equal(pin.buildProfile, "ciArtifacts");
   assert.ok(Number.isFinite(Date.parse(pin.builtAt)));
   assert.ok(
     Array.isArray(pin.compatibleVersions) &&

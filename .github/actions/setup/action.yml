@@ -10,29 +10,11 @@ runs:
         cache: pnpm
     - run: pnpm install --frozen-lockfile
       shell: bash
-    # Bound the full process tree, including native declaration children, and
-    # keep compiler process groups separate from the Actions runner.
+    # Use upstream's consumer CI profile with canonical public SDK declarations.
     - run: |
         free -m
         df -h .
-        sdk_builder="connections-sdk-builder:${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-        sdk_container="connections-sdk-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-        docker build --file .github/actions/setup/Dockerfile \
-          --build-arg "CONNECTIONS_BUILD_UID=$(id -u)" \
-          --build-arg "CONNECTIONS_BUILD_GID=$(id -g)" \
-          --tag "$sdk_builder" .github/actions/setup
-        if docker run --init --name "$sdk_container" \
-          --memory=5g --memory-swap=5g \
-          --env OPENCLAW_TSDOWN_MAX_OLD_SPACE_MB \
-          --volume "$PWD:$PWD" --workdir "$PWD" \
-          "$sdk_builder" node scripts/prepare-host.mjs; then
-          sdk_exit=0
-        else
-          sdk_exit=$?
-        fi
-        docker inspect --format 'SDK compiler OOMKilled={{.State.OOMKilled}} ExitCode={{.State.ExitCode}}' "$sdk_container"
-        docker rm "$sdk_container"
-        exit "$sdk_exit"
+        pnpm prepare:host
       shell: bash
       env:
         OPENCLAW_TSDOWN_MAX_OLD_SPACE_MB: "4352"

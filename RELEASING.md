@@ -98,13 +98,12 @@ compatibility range. Keep source pin/checksum, SDK dependency labels, peer/API r
 minimum version, build declarations, notices and lockfile aligned when upgrading.
 
 Every CI and publication job runs `pnpm prepare:host` and asserts the built revision.
-The Linux jobs build the host in a compiler container with 5 GiB total memory,
-no swap and upstream's `OPENCLAW_TSDOWN_MAX_OLD_SPACE_MB=4352` setting. The official
-Node 24.19.0 image is pinned by digest in `.github/actions/setup/Dockerfile`; the
-build user matches the runner's file ownership. This bounds native declaration
-children as well as the V8 heap and separates compiler process groups from the
-runner. The complete source host and declarations are built, then the plugin
-checks and native/browser acceptance run on the runner against that host.
+Preparation uses upstream's `build:ci-artifacts` profile, recorded as `ciArtifacts`
+in the host pin. It builds the complete Gateway runtime, Control UI, metadata and
+canonical public SDK declarations, including upstream's SDK export checks. It
+does not generate unused declarations for the entire OpenClaw application.
+Previous generated host output is cleared before preparation. Linux jobs use
+upstream's `OPENCLAW_TSDOWN_MAX_OLD_SPACE_MB=4352` compiler heap setting.
 A version-only test is insufficient for this source target. Connections 0.2.1 is the
 patch correcting the 0.2.0 gate; publication still uses only workflow tokens.
 
