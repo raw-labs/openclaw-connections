@@ -30,8 +30,9 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-      # GITHUB_TOKEN-created PRs do not trigger pull_request workflows. Explicit
-      # dispatch runs the same required CI on each release PR's own branch.
+      # Bot-created PRs can omit CI or await maintainer approval. Dispatch checks
+      # each head branch; approve a pending original PR run after reviewing its
+      # diff so its required verify check can run (see RELEASING.md).
       - name: Validate release PRs
         env:
           GH_TOKEN: ${{ github.token }}

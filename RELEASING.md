@@ -13,10 +13,15 @@ Use conventional commit subjects. Before 1.0, `fix:` and `feat:` advance the pat
 compatibility; consumers pin an exact version. The first release is `0.1.0`.
 
 On main, Release Please opens or updates a release PR with the version and changelog.
-Its workflow explicitly dispatches CI on that PR's branch: PRs created by
-`GITHUB_TOKEN` otherwise do not trigger PR workflows. Review and merge the release PR
-only after its `verify` check passes. If `verify` is missing or a bot-created run
-reports `action_required`, dispatch CI on the release PR's exact head branch:
+Its workflow explicitly dispatches CI on that PR's branch because bot-created PRs
+may omit PR workflows or require maintainer approval. Review and merge the release PR
+only after its required `verify` check passes. If the original PR run reports
+`action_required`, review the release diff and use **Approve and run** on that run's
+Actions page. A dispatched head-branch run does not resolve this pending approval;
+confirm that `verify` appears on the PR itself before merging.
+
+If no PR run is awaiting approval and `verify` is missing, dispatch CI on the
+release PR's exact head branch:
 
 ```sh
 gh workflow run ci.yml --repo raw-labs/openclaw-connections --ref RELEASE_PR_HEAD
