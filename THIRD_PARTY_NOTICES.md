@@ -16,5 +16,5 @@ The RawClaw redistribution qualification is preserved in [NOTICE](NOTICE).
   revision `44287507be2070df8ecaf75725ed0f6616b6d15a`; source paths remain in
   [assets/catalog.json](assets/catalog.json).
 
-OpenClaw is supplied by the host and pinned to `2026.9.8` for development and peer
+OpenClaw is supplied by the host and pinned to `2026.10.2` for development and peer
 compatibility. TypeBox and Zod are bundled with their license notices in the build.

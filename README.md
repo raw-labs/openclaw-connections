@@ -18,8 +18,12 @@ when needed; execution uses the exact described version and account generation.
 
 ## Install and configure
 
-Requires Node `24.16+` within Node 24, or `26.1+`, and OpenClaw `2026.9.8`, the pinned SDK
-target. Other OpenClaw versions need compatibility verification before use.
+Requires Node `24.16+` within Node 24, or `26.1+`, and OpenClaw `2026.10.2`, the pinned SDK
+target. The host must provide runtime-bound `openKeyedStore` with
+`retention: "retained"`, `registerIfAbsent`, `observe`/`compareAndApply`,
+`entriesInKeyRange` and action-bound `withCurrent`. Missing capabilities, denied state
+access and failed reads stop startup or the operation; there is no custom-file or
+bounded-cache fallback. Other OpenClaw versions need compatibility verification before use.
 The package name is `@raw-labs/openclaw-connections`, prepared for private distribution through
 GitHub Packages.
 See [releases and private package access](RELEASING.md).
@@ -119,14 +123,41 @@ lookup and paged results use the same `connections_call` tool. See the bundled
 
 ## State and trust
 
-State lives at
-`<OpenClaw state directory>/connections/connections.sqlite`, created
-with owner-only permissions. It stores account references, names, grants, pending setup
-links/ticket hashes and call receipts/results; it never stores the Composio project key
-or service OAuth tokens. Persist the entire `connections` directory across Gateway
-or container replacement; retaining only selected OpenClaw subdirectories can lose
-this plugin's state. Do not run multiple Gateways against the same database. Back it up as
-sensitive data: results can contain information from your connected services.
+Connections uses OpenClaw's public plugin-scoped retained state SDK. The host owns
+`<resolved OpenClaw state directory>/state/openclaw.sqlite` and its SQLite lifecycle.
+Persist and back up the canonical OpenClaw state directory using the host's supported
+backup procedure; no separate Connections directory or mount is required. State is
+scoped by the runtime-bound plugin ID, with versioned identity, registry and receipt
+and result namespaces. Each Gateway state directory retains one Composio user identity; selected
+agent grants and exact agent/session/call receipt bindings enforce application access.
+Do not run multiple Connections service instances or Gateways against the same state:
+startup recovery treats unfinished dispatch and setup as interrupted work.
+
+Records include account references, names, grants, pending setup links/ticket hashes
+and call receipts/results; they never contain the Composio project key or service
+OAuth tokens. Treat backups as sensitive: results can contain connected-service data.
+All authoritative namespaces use retained storage without SDK TTL or eviction.
+Connection revisions and the 1,000-connection limit share one atomic CAS registry;
+the SDK's 1 MiB JSON value limit bounds that registry and each receipt. Result payloads
+(up to 8 MiB of serialized JSON) use immutable retained chunks; one receipt CAS
+publishes the chunk count, byte length and digest only after every chunk is saved.
+A payload write failure records the known outcome without its result and surfaces
+the storage error. Pruning removes payload references before deleting expired chunks,
+and also removes orphan chunks from interrupted writes. A large
+registry can reach the byte limit before 1,000 entries; failed writes are surfaced.
+Receipt identities remain indefinitely after payload pruning, so disk use grows with
+call history. Receipt scans use bounded SDK pages, but recovery/pruning and result-ID
+lookup still scan retained history.
+
+This storage cutover starts fresh: there is no import of an old custom SQLite file,
+migration or dual write. Existing custom files are neither read nor deleted.
+
+The published OpenClaw `2026.10.2` host supports plugin-scoped state for all
+loaded plugins, including private packages and local installs. OpenClaw `2026.9.8`
+is not supported by this release: its published host denied this plugin's state access.
+The plugin requires the public retained/CAS and action-authority contracts, without
+trust bypasses or internal database facades. Never downgrade a host against expanded
+retained state without restoring a compatible backup.
 
 Management uses authenticated native Gateway RPC requiring `operator.admin`. There is
 no browser-facing provider credential or separate HTTP management API. The Gateway

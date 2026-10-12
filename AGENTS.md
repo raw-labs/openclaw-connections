@@ -14,7 +14,7 @@
 - Persist a dispatch receipt before external effects. Serialize conflicting operations;
   never automatically replay a mutation after a timeout or process interruption.
   Keep outcome-unknown explicit. Validate our envelopes; provider schemas are advisory.
-- Keep provider I/O in its adapter, SQL in the local store and lifetimes in plugin wiring.
+- Keep provider I/O in its adapter, durable state in the local store and lifetimes in plugin wiring.
   Use strict TypeScript, runtime boundary validation and parameterized SQL. No `any`,
   unsafe casts, blanket suppressions or sibling-repository runtime imports.
 - README.md owns installation, configuration and actual limits; RELEASING.md owns

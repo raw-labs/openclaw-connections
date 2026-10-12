@@ -796,6 +796,18 @@ await test(
         }),
       });
       assert.equal(disabled.status, 404);
+    } catch (error) {
+      context.diagnostic(
+        diagnostics
+          .split("\n")
+          .filter(
+            (line) =>
+              line.includes("plugin service failed") ||
+              line.includes("connections.status"),
+          )
+          .join("\n"),
+      );
+      throw error;
     } finally {
       await stop();
       if (packedDirectory)
