@@ -619,6 +619,17 @@ await test(
         assert.ok(ui, JSON.stringify(catalog));
         const browser = await chromium.launch();
         try {
+          const cancelledEntry = managementOutputs.create.parse(
+            await rpc("connections.create", {
+              connectorId: "github",
+              name: "Cancel then remove regression",
+              grant: { mode: "all" },
+            }),
+          );
+          await rpc("connections.start", {
+            connectionId: cancelledEntry.id,
+            revision: cancelledEntry.revision,
+          });
           const page = await browser.newPage({
             extraHTTPHeaders: { authorization: `Bearer ${token}` },
           });
@@ -638,6 +649,46 @@ await test(
           await page
             .getByText("Native test account", { exact: true })
             .waitFor();
+          const cancelledRow = page.getByRole("row").filter({
+            hasText: "Cancel then remove regression",
+          });
+          await cancelledRow
+            .getByRole("button", { name: "Cancel setup", exact: true })
+            .click();
+          await page
+            .getByRole("button", { name: "Cancel setup", exact: true })
+            .last()
+            .click();
+          await cancelledRow
+            .getByText("Disconnected", { exact: true })
+            .waitFor();
+          const afterCancel = await readFile(
+            env.CONNECTIONS_TEST_REQUESTS,
+            "utf8",
+          );
+          assert.equal(
+            afterCancel.split("DELETE /api/v3.1/connected_accounts/ca_cancel\n")
+              .length - 1,
+            1,
+          );
+          await cancelledRow
+            .getByRole("button", { name: "Remove", exact: true })
+            .click();
+          await page
+            .getByRole("button", { name: "Remove", exact: true })
+            .last()
+            .click();
+          await cancelledRow.waitFor({ state: "detached" });
+          assert.equal(
+            await readFile(env.CONNECTIONS_TEST_REQUESTS, "utf8"),
+            afterCancel,
+          );
+          assert.deepEqual(
+            managementOutputs.list
+              .parse(await rpc("connections.list"))
+              .items.map((item) => item.id),
+            [connected.id],
+          );
           await page
             .getByRole("button", { name: "Add connection", exact: true })
             .click();

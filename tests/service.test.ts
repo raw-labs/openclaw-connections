@@ -24,6 +24,7 @@ class Provider implements ConnectorProvider {
   deletions = 0;
   setups = 0;
   failDelete = false;
+  deleteCompletion: "outcome_unknown" | "rejected" = "outcome_unknown";
   unknownSetup = false;
   unknownAuthConfiguration = false;
   authConfigurations = 0;
@@ -74,9 +75,11 @@ class Provider implements ConnectorProvider {
     this.deletions++;
     if (this.failDelete)
       throw new ConnectorProviderError(
-        "connector_provider_unknown_outcome",
-        "Cleanup outcome unknown.",
-        "outcome_unknown",
+        this.deleteCompletion === "outcome_unknown"
+          ? "connector_provider_unknown_outcome"
+          : "connector_provider_rejected",
+        `Cleanup ${this.deleteCompletion}.`,
+        this.deleteCompletion,
       );
     return { status: "deleted" as const, revocationJobId: null };
   }
@@ -139,7 +142,7 @@ async function fixture(
     input: unknown,
     actor = "admin-one",
   ) => service.manage(method, input, actor, ["main", "researcher"], current);
-  async function linked() {
+  async function pending() {
     const created = managementOutputs.create.parse(
       await manage("create", {
         connectorId: "github",
@@ -153,6 +156,11 @@ async function fixture(
         revision: created.revision,
       }),
     );
+    assert.ok(started.setup);
+    return { created, started };
+  }
+  async function linked() {
+    const { created, started } = await pending();
     assert.ok(started.setup);
     const connected = managementOutputs.complete.parse(
       await manage("complete", {
@@ -175,6 +183,7 @@ async function fixture(
     provider,
     manage,
     linked,
+    pending,
     revoke: () => {
       admitted = false;
     },
@@ -477,6 +486,154 @@ await test("complete large Unicode JSON is paged without another provider execut
     }
     assert.deepEqual(JSON.parse(text), { text: "𝄞 response ".repeat(10_000) });
     assert.equal(f.provider.executions, 1);
+  } finally {
+    await f.close();
+  }
+});
+await test("successful cancellation clears cleanup bindings and one Remove deletes the row without another provider request", async () => {
+  const f = await fixture();
+  try {
+    const { created, started } = await f.pending();
+    assert.ok(started.setup);
+    const before = await f.store.get(created.id);
+    assert.ok(before.setup?.binding);
+    const cancelled = managementOutputs.cancel.parse(
+      await f.manage("cancel", {
+        connectionId: created.id,
+        setupId: started.setup.id,
+        revision: before.revision,
+      }),
+    );
+    const saved = await f.store.get(created.id);
+    assert.equal(saved.state, "disconnected");
+    assert.equal(saved.setup?.state, "cancelled");
+    assert.equal(saved.setup?.binding, null);
+    assert.equal(saved.binding, null);
+    assert.equal(saved.failure, null);
+    assert.equal(f.provider.deletions, 1);
+    await assert.rejects(
+      f.manage("disconnect", {
+        connectionId: created.id,
+        revision: before.revision,
+      }),
+      /changed/,
+    );
+    assert.deepEqual(
+      await f.manage("disconnect", {
+        connectionId: created.id,
+        revision: cancelled.revision,
+      }),
+      { removed: true },
+    );
+    assert.equal((await f.store.list()).length, 0);
+    assert.equal(f.provider.deletions, 1);
+  } finally {
+    await f.close();
+  }
+});
+await test("Remove cleans a retained cancelled binding from an older version and removes the row in one operation", async () => {
+  const f = await fixture();
+  try {
+    const { created } = await f.pending();
+    const item = await f.store.get(created.id);
+    assert.ok(item.setup);
+    const retained = await f.store.save({
+      ...item,
+      state: "disconnected",
+      setup: { ...item.setup, state: "cancelled", url: null },
+    });
+    assert.deepEqual(
+      await f.manage("disconnect", {
+        connectionId: created.id,
+        revision: retained.revision,
+      }),
+      { removed: true },
+    );
+    assert.equal(f.provider.deletions, 1);
+    assert.equal((await f.store.list()).length, 0);
+  } finally {
+    await f.close();
+  }
+});
+for (const completion of ["outcome_unknown", "rejected"] as const)
+  await test(`${completion} cancellation retains the exact cleanup binding and requires explicit recovery`, async () => {
+    const f = await fixture();
+    try {
+      const { created, started } = await f.pending();
+      assert.ok(started.setup);
+      const before = await f.store.get(created.id);
+      f.provider.failDelete = true;
+      f.provider.deleteCompletion = completion;
+      await assert.rejects(
+        f.manage("cancel", {
+          connectionId: created.id,
+          setupId: started.setup.id,
+          revision: before.revision,
+        }),
+        /Cleanup/,
+      );
+      const saved = await f.store.get(created.id);
+      assert.equal(saved.state, "needs_attention");
+      assert.deepEqual(saved.setup?.binding, before.setup?.binding);
+      assert.match(
+        saved.failure?.detail ?? "",
+        /cleanup could not be confirmed.*Disconnect/,
+      );
+      assert.equal(f.provider.deletions, 1);
+      const reopened = await f.reopen();
+      assert.deepEqual(
+        (await reopened.get(saved.id)).setup?.binding,
+        before.setup?.binding,
+      );
+      await reopened.close();
+      assert.equal(f.provider.deletions, 1);
+      f.provider.failDelete = false;
+      assert.deepEqual(
+        await f.manage("disconnect", {
+          connectionId: saved.id,
+          revision: saved.revision,
+        }),
+        { removed: false },
+      );
+      const recovered = await f.store.get(saved.id);
+      assert.equal(recovered.state, "disconnected");
+      assert.equal(recovered.binding, null);
+      assert.equal(recovered.setup, null);
+      assert.equal(recovered.failure, null);
+      assert.deepEqual(
+        await f.manage("disconnect", {
+          connectionId: recovered.id,
+          revision: recovered.revision,
+        }),
+        { removed: true },
+      );
+      assert.equal(f.provider.deletions, 2);
+    } finally {
+      await f.close();
+    }
+  });
+await test("connected Disconnect retains a reusable row and retires the generation", async () => {
+  const f = await fixture();
+  try {
+    const { connected } = await f.linked();
+    assert.deepEqual(
+      await f.manage("disconnect", {
+        connectionId: connected.id,
+        revision: connected.revision,
+      }),
+      { removed: false },
+    );
+    const saved = await f.store.get(connected.id);
+    assert.equal(saved.state, "disconnected");
+    assert.equal(saved.generation, connected.generation + 1);
+    assert.equal(saved.binding, null);
+    assert.equal(saved.setup, null);
+    assert.deepEqual(saved.grant, connected.grant);
+    assert.equal(f.provider.deletions, 1);
+    await assert.rejects(
+      f.service.call(execute(connected.id, connected.generation), context),
+      /unavailable/,
+    );
   } finally {
     await f.close();
   }

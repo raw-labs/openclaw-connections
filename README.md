@@ -128,7 +128,12 @@ Edit a connection to rename it or restrict it to selected native agents. Reconne
 disables the old generation before contacting Composio and retires the previous account.
 Disconnect blocks execution locally before requesting provider cleanup. A cleanup error
 remains visible; access stays disabled. Refresh and retry Disconnect explicitly.
-Remove deletes an inactive local entry after confirmed cleanup.
+Successful Cancel setup clears the setup's cleanup binding. Remove deletes an inactive
+local entry in one action, including any retained account cleanup. Connected Disconnect
+keeps a reusable disconnected entry. Failed or uncertain cleanup retains the account
+binding and recovery guidance until an explicit retry succeeds. Confirmation here means
+Composio account deletion or absence; upstream token revocation may run asynchronously
+and is not verified by this plugin.
 
 The three tools perform search, schema description and exact-account execution. Call
 lookup and paged results use the same `connections_call` tool. See the bundled

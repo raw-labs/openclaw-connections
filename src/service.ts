@@ -370,12 +370,34 @@ export class ConnectionsService {
               );
               throw error;
             }
+            // Retain cleanup identity until the adapter confirms account deletion.
+            // Cancelled setups must not dispatch the same cleanup on a later Remove.
+            const binding =
+              item.binding?.accountId === pending.accountId &&
+              item.binding.subjectId === pending.subjectId &&
+              item.binding.toolkit === pending.toolkit &&
+              item.binding.authConfigurationId === pending.authConfigurationId
+                ? null
+                : item.binding;
+            item = await this.store.save(
+              {
+                ...item,
+                binding,
+                failure: binding ? item.failure : null,
+                setup: item.setup
+                  ? { ...item.setup, binding: null, failure: null }
+                  : null,
+              },
+              current,
+            );
           }
           return publicConnection(item);
         }
         case "disconnect": {
           const input = managementInputs.disconnect.parse(raw);
           let item = await get(input.connectionId, input.revision);
+          // Match the UI's Remove action; Disconnect keeps a reusable configuration.
+          const remove = item.state !== "connected" && !item.failure;
           const bindings = [item.binding, item.setup?.binding].filter(
             (v) => v !== null && v !== undefined,
           );
@@ -411,7 +433,7 @@ export class ConnectionsService {
             );
             throw error;
           }
-          if (!bindings.length) {
+          if (remove || !bindings.length) {
             await this.store.remove(item.id, item.revision, current);
             return { removed: true };
           }
