@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/raw-labs/openclaw-connections/compare/v0.2.2...v0.2.3) (2026-10-13)
+
+
+### Bug Fixes
+
+* remove cancelled connections in one action ([#15](https://github.com/raw-labs/openclaw-connections/issues/15)) ([c42783e](https://github.com/raw-labs/openclaw-connections/commit/c42783ed972846a506a8b14cb9fd0c40970d707e))
+
 ## [0.2.2](https://github.com/raw-labs/openclaw-connections/compare/v0.2.1...v0.2.2) (2026-10-12)
 
 
