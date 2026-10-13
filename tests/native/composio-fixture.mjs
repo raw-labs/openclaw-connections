@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { appendFile } from "node:fs/promises";
 const originalFetch = globalThis.fetch;
+let setups = 0;
 globalThis.fetch = async (input, init) => {
   const url = new URL(input instanceof Request ? input.url : String(input));
   if (url.hostname !== "backend.composio.dev")
@@ -9,7 +10,7 @@ globalThis.fetch = async (input, init) => {
   if (process.env.CONNECTIONS_TEST_REQUESTS)
     await appendFile(
       process.env.CONNECTIONS_TEST_REQUESTS,
-      `${url.pathname}\n`,
+      `${init?.method ?? "GET"} ${url.pathname}\n`,
     );
   assert.equal(
     new Headers(init?.headers).get("x-api-key"),
@@ -28,14 +29,24 @@ globalThis.fetch = async (input, init) => {
   if (path === "/api/v3.1/connected_accounts/link") {
     assert.equal(body.auth_config_id, "ac_native");
     return Response.json({
-      connected_account_id: "ca_native",
+      connected_account_id: ++setups === 1 ? "ca_native" : "ca_cancel",
       redirect_url: "https://connect.composio.dev/synthetic",
       expires_at: new Date(Date.now() + 3600000).toISOString(),
     });
   }
-  if (path === "/api/v3.1/connected_accounts/ca_native") {
+  if (
+    path === "/api/v3.1/connected_accounts/ca_native" ||
+    path === "/api/v3.1/connected_accounts/ca_cancel"
+  ) {
+    if (init?.method === "DELETE") {
+      assert.equal(url.searchParams.get("revoke_on_delete"), "true");
+      return Response.json({
+        success: true,
+        revoke_job_id: "synthetic-revoke-job",
+      });
+    }
     return Response.json({
-      id: "ca_native",
+      id: path.split("/").at(-1),
       user_id: "native-test-owner",
       toolkit: { slug: "github" },
       auth_config: { id: "ac_native" },
