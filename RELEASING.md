@@ -1,6 +1,7 @@
-# Private packages and releases
+# Packages and releases
 
-The source repository and package stay private. The npm name is
+The source repository and GitHub Release assets are public. The GitHub Packages
+package remains private for existing consumers. The npm name is
 `@raw-labs/openclaw-connections`; the native plugin ID stays `openclaw-connections`.
 `package.json` owns the version. The build regenerates the manifest from it, and
 Release Please updates both files together. Artifacts contain bundled runtime code,
@@ -47,7 +48,19 @@ fail rather than replacing it. Never delete or reuse an already-published versio
 published defect with a new version. GitHub Actions run artifacts also
 contain the verified tarball, but are not versioned releases.
 
-## Consuming the private package
+## Public installation
+
+Download the versioned `.tgz` asset from
+[GitHub Releases](https://github.com/raw-labs/openclaw-connections/releases) and follow
+the [native installation instructions](README.md#install-and-configure). Public release
+downloads do not require registry credentials. Source builds are also supported.
+The host compatibility and experimental limits in the README still apply.
+
+Publishing source does not move the package to npmjs.org or change GitHub Packages
+visibility. Previously published archives are immutable and retain the documentation
+from their release; the default branch documents the current distribution policy.
+
+## Consuming the private registry package
 
 After the first publication, keep package visibility **Private**, link it to this
 repository and inherit repository permissions. In the package's **Manage Actions
@@ -78,7 +91,7 @@ GitHub Packages is the registry, not public npm. Local registry downloads requir
 classic PAT with `read:packages` and repository access, including organization SSO
 when required. Keep registry authentication in the user's private npm configuration
 or the workflow's generated configuration, never in this repository.
-Alternatively, an authenticated repository reader can download the attached tarball:
+Authenticated CLI users can also download a public release tarball:
 
 ```sh
 gh release download vVERSION --repo raw-labs/openclaw-connections --pattern '*.tgz'
@@ -122,3 +135,16 @@ separate deployment qualification; a plugin release does not deploy those consum
 
 References: [GitHub npm registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry),
 [Release Please action](https://github.com/googleapis/release-please-action).
+
+## Public repository operations
+
+Keep secret scanning, push protection and private vulnerability reporting enabled.
+Require maintainer approval for workflows from all outside collaborators. CI runs PR
+code with `contents: read`; privileged release jobs run only on main or explicit
+maintainer dispatch. Do not use `pull_request_target` to execute contributor code.
+
+RAW Labs' Depot runner group must allow this public repository. Retain the existing
+Linux ARM runner sizes and the required `verify` branch check. New contributors need
+their own compatible OpenClaw host and Composio project; never share project keys in
+issues, pull requests, screenshots or test logs. See
+[the security policy](https://github.com/raw-labs/openclaw-connections/security/policy).

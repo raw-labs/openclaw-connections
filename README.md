@@ -3,6 +3,9 @@
 A standalone native OpenClaw plugin with a Connections page and three agent tools:
 `connections_search`, `connections_describe` and `connections_call`.
 
+Experimental software: host compatibility is narrowly qualified and live provider
+acceptance remains unverified. Review the installation requirements and limits below.
+
 The existing OpenClaw Codex harness can expose these tools through its dynamic-tool
 bridge when native tool policy allows them; no separate MCP adapter is required.
 
@@ -31,9 +34,20 @@ The host must provide runtime-bound `openKeyedStore` with `retention: "retained"
 or the operation; there is no custom-file or bounded-cache fallback. Other revisions
 need compatibility verification before use. The source commit and archive checksum
 are recorded in [openclaw-host.json](openclaw-host.json).
-The package name is `@raw-labs/openclaw-connections`, prepared for private distribution through
-GitHub Packages.
-See [releases and private package access](RELEASING.md).
+Download the `raw-labs-openclaw-connections-VERSION.tgz` asset from
+[GitHub Releases](https://github.com/raw-labs/openclaw-connections/releases), then install
+it into a compatible host:
+
+```sh
+openclaw plugins install npm-pack:/absolute/path/to/raw-labs-openclaw-connections-VERSION.tgz --force --accept-capabilities
+```
+
+Replace `VERSION` with the selected exact release. Release downloads and source are
+public. The `@raw-labs/openclaw-connections` package in GitHub Packages remains private
+for existing consumers; no registry credential is needed for the release download.
+See [releases and package access](RELEASING.md).
+
+To build the plugin from a source checkout instead:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -227,7 +241,8 @@ runtime dependency on either donor repository. See
 `pnpm inspect:package` validates version alignment and the contents of the installable
 tarball. GitHub Actions runs these checks with Node 24.19.0 and the locked dependencies
 on PRs, main and explicit dispatches. See [the release guide](RELEASING.md) for versions,
-publishing and private consumers.
+publishing and registry consumers. Report security vulnerabilities through
+[private vulnerability reporting](https://github.com/raw-labs/openclaw-connections/security/advisories/new).
 
 Automated tests use controlled Composio responses and temporary OpenClaw state. They
 do not establish real external OAuth consent, provider execution or a live Codex

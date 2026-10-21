@@ -23,8 +23,9 @@
 - Review changed files. Run `pnpm check`, `pnpm build` and relevant native/browser
   verification before delivery. State what was not tested. Clean disposable fixtures.
 - Keep SDK versions, lockfile and compatibility declarations aligned. Package versions
-  come from package.json; inspect the packed artifact before release. Preserve private
-  visibility and use workflow tokens for publishing.
+  come from package.json; inspect the packed artifact before release. The source
+  repository is public; keep the GitHub Packages package private and use workflow
+  tokens for publishing. Public release tarballs are the unauthenticated install path.
 - Use RAW Labs' Depot Linux ARM runners for CI and publication, with sufficient
   memory for pinned SDK qualification.
 - Work only on the requested slice. Preserve unrelated work; push only when authorized.
