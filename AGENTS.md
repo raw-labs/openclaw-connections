@@ -2,7 +2,7 @@
 
 - This project is a standalone native OpenClaw plugin. OpenClaw owns login, roles,
   agents, tool policy and the UI host. Composio owns provider authentication and execution.
-  No ClawScarf Cloud, WorkOS, billing backend or separate application server.
+  No separate identity provider, billing backend or application server.
 - Keep the Connections UI and three search/describe/call tools straightforward.
   Reuse the existing UI primitives and public OpenClaw SDK; pin and test SDK upgrades.
 - Resolve the Composio key through native SecretRef configuration. Never send it to

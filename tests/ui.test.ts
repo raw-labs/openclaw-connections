@@ -261,7 +261,7 @@ await test("link opens a separate tab and completion sends only the original bro
     );
     assert.doesNotMatch(
       JSON.stringify(calls),
-      /apiKey|x-api-key|managementKey|clawscarf/,
+      /apiKey|x-api-key|managementKey/,
     );
   } finally {
     f.close();

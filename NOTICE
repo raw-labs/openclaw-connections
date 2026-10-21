@@ -1,14 +1,7 @@
 OpenClaw Connections
 
-Adapted from ClawScarf (MIT), its Connections plugin and ClawScarf Cloud's
-Composio provider implementation. See THIRD_PARTY_NOTICES.md for revisions and
-inherited provenance. No donor deployment or runtime dependency is included.
+Copyright (c) 2026 RAW Labs SA
+https://www.raw-labs.com
 
-Contains source, UI and tests adapted from RawClaw,
-https://github.com/raw-labs/rawclaw
-Revision f37a6e786fdd88857c21bd32140567874e281a8c
-Copyright (c) RAW Labs contributors.
-
-RawClaw was an earlier RAW Labs experiment. These references record historical
-provenance; this package is a standalone native OpenClaw plugin with no runtime
-dependency on that experiment. Historical copyright and license notices are retained.
+This standalone native OpenClaw plugin is distributed under the MIT license.
+See LICENSE and THIRD_PARTY_NOTICES.md for the license and dependency notices.
