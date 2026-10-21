@@ -1,7 +1,8 @@
 # Third-party notices
 
 This project uses the ClawScarf MIT license and retains inherited donor notices.
-The RawClaw redistribution qualification is preserved in [NOTICE](NOTICE).
+Historical RAW Labs experiment references are explained in [NOTICE](NOTICE);
+they do not describe runtime dependencies of this standalone OpenClaw plugin.
 
 - [ClawScarf](https://github.com/clawscarf/clawscarf), revision
   `be4769f0b54ec390cf31788bf13fb7ae1e7f2344`: Connections page, native page primitives,
