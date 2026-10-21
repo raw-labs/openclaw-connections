@@ -3,17 +3,19 @@
 A standalone native OpenClaw plugin with a Connections page and three agent tools:
 `connections_search`, `connections_describe` and `connections_call`.
 
+By [RAW Labs SA](https://www.raw-labs.com), distributed under the [MIT license](LICENSE).
+
 Experimental software: host compatibility is narrowly qualified and live provider
 acceptance remains unverified. Review the installation requirements and limits below.
 
 The existing OpenClaw Codex harness can expose these tools through its dynamic-tool
 bridge when native tool policy allows them; no separate MCP adapter is required.
 
-Use your own Composio project. No ClawScarf Cloud account, WorkOS login, separate web
-server or PostgreSQL database is required. OpenClaw owns authentication, administrator
+Use your own Composio project. No separate web server or PostgreSQL database is
+required. OpenClaw owns authentication, administrator
 roles, agents and tool policy. Composio hosts provider authentication and execution.
 
-The page preserves the ClawScarf Connections layout: searchable service picker,
+The Connections page provides a searchable service picker,
 category filters, account status, connect/reconnect, names, agent grants and disconnect.
 Usage shows local call activity; billing and quotas belong to your Composio project.
 The bundled catalog contains 44 services. Tool definitions are fetched from Composio
@@ -234,8 +236,7 @@ isolated public-SDK host fixture; Gateway installation and RPC are exercised sep
 Chromium loads the packed
 UI asset served by the Gateway through a small public-SDK host fixture with real
 native RPC; this checks rendering on desktop and mobile, without automating the full
-OpenClaw shell or its plugin consent flow. The plugin has no
-runtime dependency on either donor repository. See
+OpenClaw shell or its plugin consent flow. See
 [AGENTS.md](AGENTS.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
 
 `pnpm inspect:package` validates version alignment and the contents of the installable

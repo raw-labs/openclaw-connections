@@ -4,6 +4,10 @@
   "description": "Native OpenClaw Connections UI and agent tools, using your own Composio project.",
   "type": "module",
   "license": "MIT",
+  "author": {
+    "name": "RAW Labs SA",
+    "url": "https://www.raw-labs.com"
+  },
   "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=24.16.0 <25 || >=26.1.0"
