@@ -5,7 +5,7 @@ A standalone native OpenClaw plugin with a Connections page and three agent tool
 
 By [RAW Labs SA](https://www.raw-labs.com), distributed under the [MIT license](LICENSE).
 
-Experimental software: host compatibility is narrowly qualified and live provider
+Experimental software: host qualification is narrow and live provider
 acceptance remains unverified. Review the installation requirements and limits below.
 
 The existing OpenClaw Codex harness can expose these tools through its dynamic-tool
@@ -25,17 +25,19 @@ when needed; execution uses the exact described version and account generation.
 
 Requires Node `24.16+` within Node 24, or `26.1+`. The primary OpenClaw target is
 source commit `90d30a1178a79dddd92e6190b66b95d89dfb3ca8`, labelled `2026.9.8`,
-the revision selected by OCE. The previously qualified published `2026.10.2` host
-also remains admitted. Version labels alone are insufficient: the published npm
+the revision selected by OCE. Compatibility metadata admits OpenClaw `>=2026.9.8`
+without an upper version bound; the previously qualified published `2026.10.2` host
+remains admitted. Newer hosts are not automatically qualified. Version labels alone
+are insufficient: the published npm
 `2026.9.8` package is an older snapshot that refuses private-plugin state and is
 **not supported**. Use the specified source-built host, not that npm package.
 
 The host must provide runtime-bound `openKeyedStore` with `retention: "retained"`,
 `registerIfAbsent`, `observe`/`compareAndApply`, `entriesInKeyRange` and action-bound
 `withCurrent`. Missing capabilities, denied state access and failed reads stop startup
-or the operation; there is no custom-file or bounded-cache fallback. Other revisions
-need compatibility verification before use. The source commit and archive checksum
-are recorded in [openclaw-host.json](openclaw-host.json).
+or the operation; there is no custom-file or bounded-cache fallback. Newer revisions
+are not rejected by version alone, but still need these capabilities and deployment
+verification before use. The source commit and archive checksum are recorded in [openclaw-host.json](openclaw-host.json).
 Download the `raw-labs-openclaw-connections-VERSION.tgz` asset from
 [GitHub Releases](https://github.com/raw-labs/openclaw-connections/releases), then install
 it into a compatible host:

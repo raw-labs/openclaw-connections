@@ -13,14 +13,8 @@ assert.equal(manifest.version, pkg.version);
 const { pin } = await assertPinnedHost();
 assert.equal(pkg.devDependencies.openclaw, pin.version);
 assert.equal(pkg.devDependencies["@openclaw/codex"], pin.version);
-assert.equal(
-  pkg.peerDependencies.openclaw,
-  pin.compatibleVersions.join(" || "),
-);
-assert.equal(
-  pkg.openclaw.compat.pluginApi,
-  `>=${pin.version} <=${pin.compatibleVersions.at(-1)}`,
-);
+assert.equal(pkg.peerDependencies.openclaw, `>=${pin.version}`);
+assert.equal(pkg.openclaw.compat.pluginApi, `>=${pin.version}`);
 assert.equal(pkg.openclaw.build.openclawVersion, pin.version);
 assert.equal(
   pkg.openclaw.compat.minGatewayVersion,
