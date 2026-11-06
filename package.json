@@ -1,6 +1,6 @@
 {
   "name": "@raw-labs/openclaw-connections",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Native OpenClaw Connections UI and agent tools, using your own Composio project.",
   "type": "module",
   "license": "MIT",

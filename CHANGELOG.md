@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.4](https://github.com/raw-labs/openclaw-connections/compare/v0.2.3...v0.2.4) (2026-11-06)
+
+
+### Bug Fixes
+
+* correct RAW Labs SA ownership and remove obsolete references ([#18](https://github.com/raw-labs/openclaw-connections/issues/18)) ([847b22b](https://github.com/raw-labs/openclaw-connections/commit/847b22b3c6bc99b6469c5459e9dd4d7c599cd2da))
+* remove OpenClaw compatibility ceiling ([#20](https://github.com/raw-labs/openclaw-connections/issues/20)) ([b01dee0](https://github.com/raw-labs/openclaw-connections/commit/b01dee0680cc9c4114b937d7951710c81ae64e2e))
+
 ## [0.2.3](https://github.com/raw-labs/openclaw-connections/compare/v0.2.2...v0.2.3) (2026-10-13)
 
 
