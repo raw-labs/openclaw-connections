@@ -106,9 +106,13 @@ Connections mount. Its primary SDK/host is the source build recorded in `opencla
 `2026.9.8` at `90d30a1178a79dddd92e6190b66b95d89dfb3ca8`. The npm SDK and Codex
 harness dependency labels are pinned to `2026.9.8`; preparation builds and selects
 the exact source SDK before qualification. Stock published `2026.9.8` is unsupported.
-The already qualified published `2026.10.2` host remains admitted by the explicit
-compatibility range. Keep source pin/checksum, SDK dependency labels, peer/API ranges,
-minimum version, build declarations, notices and lockfile aligned when upgrading.
+Peer and plugin API compatibility ranges are minimum-only (`>=2026.9.8`), with no
+upper ceiling. The already qualified published `2026.10.2` host remains admitted.
+The `compatibleVersions` list in the host pin records qualification history, not an
+allowlist. Newer hosts still need the retained-state and authority capabilities
+checked at runtime; admitting them is not evidence of qualification. Keep source
+pin/checksum, SDK dependency labels, peer/API ranges, minimum version, build
+declarations, notices and lockfile aligned when upgrading.
 
 Every CI and publication job runs `pnpm prepare:host` and asserts the built revision.
 Preparation uses upstream's `build:ci-artifacts` profile, recorded as `ciArtifacts`
