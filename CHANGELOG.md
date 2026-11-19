@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/raw-labs/openclaw-connections/compare/v0.3.0...v0.3.1) (2026-11-19)
+
+
+### Features
+
+* add Google Search Console and Bing Webmaster Tools ([#23](https://github.com/raw-labs/openclaw-connections/issues/23)) ([2fb288a](https://github.com/raw-labs/openclaw-connections/commit/2fb288adefd59cd3042349205453638ef3d99075))
+
 ## [0.3.0](https://github.com/raw-labs/openclaw-connections/compare/v0.2.4...v0.3.0) (2026-11-19)
 
 
