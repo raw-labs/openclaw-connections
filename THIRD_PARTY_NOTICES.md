@@ -6,6 +6,10 @@ and is distributed under the [MIT license](LICENSE).
 - The catalog's original source is [Kora](https://github.com/raw-labs/kora-platform),
   revision `44287507be2070df8ecaf75725ed0f6616b6d15a`; source paths remain in
   [assets/catalog.json](assets/catalog.json).
+- The Google Search Console catalog entry uses the [Composio toolkit documentation](https://docs.composio.dev/toolkits/google_search_console)
+  and [logo](https://logos.composio.dev/api/google_search_console).
+- The Bing Webmaster Tools catalog entry uses the [Composio toolkit documentation](https://docs.composio.dev/toolkits/bing_webmaster_tools)
+  and [logo](https://logos.composio.dev/api/bing_webmaster_tools).
 - The PostHog catalog entry uses the [Composio toolkit documentation](https://docs.composio.dev/toolkits/posthog)
   and [logo](https://logos.composio.dev/api/posthog).
 

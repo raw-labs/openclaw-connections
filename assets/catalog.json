@@ -163,6 +163,29 @@
       }
     },
     {
+      "id": "google_search_console",
+      "toolkitSlug": "google_search_console",
+      "name": "Google Search Console",
+      "description": "Google Search Console reports how sites perform in Google Search and provides URL inspection and sitemap tools.",
+      "category": "Analytics & Data",
+      "iconUrl": "https://logos.composio.dev/api/google_search_console",
+      "auth": {
+        "kind": "managed"
+      }
+    },
+    {
+      "id": "bing_webmaster_tools",
+      "toolkitSlug": "bing_webmaster_tools",
+      "name": "Bing Webmaster Tools",
+      "description": "Bing Webmaster Tools reports Bing search performance and provides crawl diagnostics, URL inspection, and URL submission.",
+      "category": "Analytics & Data",
+      "iconUrl": "https://logos.composio.dev/api/bing_webmaster_tools",
+      "auth": {
+        "kind": "custom",
+        "scheme": "API_KEY"
+      }
+    },
+    {
       "id": "posthog",
       "toolkitSlug": "posthog",
       "name": "PostHog",

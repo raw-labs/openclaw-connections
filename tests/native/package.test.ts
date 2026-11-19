@@ -697,12 +697,24 @@ await test(
             .getByRole("button", { name: "Add connection", exact: true })
             .click();
           await page.getByText("GitHub", { exact: true }).first().waitFor();
-          const posthog = page.getByRole("button", { name: /^PostHog\b/ });
-          await posthog.waitFor();
-          assert.match(
-            (await posthog.locator("img").getAttribute("src")) ?? "",
-            /^data:image\/svg\+xml;base64,/,
-          );
+          for (const name of [
+            /^PostHog\b/,
+            /^Google Search Console\b/,
+            /^Bing Webmaster Tools\b/,
+          ]) {
+            const connector = page.getByRole("button", { name });
+            await connector.waitFor();
+            assert.ok(
+              await connector
+                .locator('img[src^="data:image/svg+xml;base64,"]')
+                .evaluate(async (icon) => {
+                  if (!(icon instanceof HTMLImageElement)) return false;
+                  await icon.decode();
+                  return icon.naturalWidth > 0;
+                }),
+              `Connector icon failed to load for ${name}`,
+            );
+          }
           await page.setViewportSize({ width: 390, height: 844 });
           assert.ok(
             await page.getByText("GitHub", { exact: true }).first().isVisible(),

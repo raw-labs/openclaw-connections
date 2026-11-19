@@ -132,6 +132,17 @@ Services with custom auth require an existing configured auth config in Composio
 Merge this map into the plugin config. Managed-auth services resolve or create their
 auth config automatically. Provider-specific auth settings remain in Composio.
 
+Google Search Console uses Composio-managed OAuth. Sign in with a Google account
+that has access to the Search Console property you want to use.
+[Google Search Console toolkit](https://docs.composio.dev/toolkits/google_search_console)
+
+Bing Webmaster Tools requires a verified site and a Bing Webmaster Tools API key.
+Create an API Key auth config for the `bing_webmaster_tools` toolkit in Composio and
+set `authConfigIds.bing_webmaster_tools` to its ID. Enter the Bing API key on the
+hosted Composio connection page.
+[Bing API access](https://learn.microsoft.com/en-us/bingwebmaster/getting-access) ·
+[Composio toolkit](https://docs.composio.dev/toolkits/bing_webmaster_tools)
+
 For [PostHog](https://docs.composio.dev/toolkits/posthog), create an API Key auth config
 for the `posthog` toolkit in your Composio project and set `authConfigIds.posthog` to
 its ID. Enter a [PostHog personal API key](https://posthog.com/docs/api#authentication)
