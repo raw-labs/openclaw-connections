@@ -413,7 +413,11 @@ await test(
                 enabled: true,
                 config: {
                   userId: "native-test-owner",
-                  authConfigIds: { github: "ac_native", slack: "ac_invalid" },
+                  authConfigIds: {
+                    github: "ac_native",
+                    slack: "ac_invalid",
+                    posthog: "ac_posthog",
+                  },
                   apiKey: {
                     source: "env",
                     provider: "default",
@@ -621,7 +625,7 @@ await test(
         try {
           const cancelledEntry = managementOutputs.create.parse(
             await rpc("connections.create", {
-              connectorId: "github",
+              connectorId: "posthog",
               name: "Cancel then remove regression",
               grant: { mode: "all" },
             }),
@@ -693,6 +697,12 @@ await test(
             .getByRole("button", { name: "Add connection", exact: true })
             .click();
           await page.getByText("GitHub", { exact: true }).first().waitFor();
+          const posthog = page.getByRole("button", { name: /^PostHog\b/ });
+          await posthog.waitFor();
+          assert.match(
+            (await posthog.locator("img").getAttribute("src")) ?? "",
+            /^data:image\/svg\+xml;base64,/,
+          );
           await page.setViewportSize({ width: 390, height: 844 });
           assert.ok(
             await page.getByText("GitHub", { exact: true }).first().isVisible(),

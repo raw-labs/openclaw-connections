@@ -163,6 +163,18 @@
       }
     },
     {
+      "id": "posthog",
+      "toolkitSlug": "posthog",
+      "name": "PostHog",
+      "description": "PostHog provides product analytics, insights, feature flags, and experiments.",
+      "category": "Analytics & Data",
+      "iconUrl": "https://logos.composio.dev/api/posthog",
+      "auth": {
+        "kind": "custom",
+        "scheme": "API_KEY"
+      }
+    },
+    {
       "id": "linear",
       "toolkitSlug": "linear",
       "name": "Linear",

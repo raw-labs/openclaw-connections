@@ -6,6 +6,8 @@ and is distributed under the [MIT license](LICENSE).
 - The catalog's original source is [Kora](https://github.com/raw-labs/kora-platform),
   revision `44287507be2070df8ecaf75725ed0f6616b6d15a`; source paths remain in
   [assets/catalog.json](assets/catalog.json).
+- The PostHog catalog entry uses the [Composio toolkit documentation](https://docs.composio.dev/toolkits/posthog)
+  and [logo](https://logos.composio.dev/api/posthog).
 
 OpenClaw is supplied by the host. Development qualifies the `2026.9.8` source build
 at `90d30a1178a79dddd92e6190b66b95d89dfb3ca8`, recorded with its archive checksum

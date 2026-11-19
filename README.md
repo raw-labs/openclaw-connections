@@ -132,6 +132,13 @@ Services with custom auth require an existing configured auth config in Composio
 Merge this map into the plugin config. Managed-auth services resolve or create their
 auth config automatically. Provider-specific auth settings remain in Composio.
 
+For [PostHog](https://docs.composio.dev/toolkits/posthog), create an API Key auth config
+for the `posthog` toolkit in your Composio project and set `authConfigIds.posthog` to
+its ID. Enter a [PostHog personal API key](https://posthog.com/docs/api#authentication)
+with the scopes your actions need on the hosted Composio connection page. Use your
+[PostHog region or instance](https://docs.composio.dev/kb/guide/toolkits-posthog)
+in Composio’s setup when required.
+
 ## Link and use accounts
 
 An OpenClaw administrator opens **Connections**, chooses **Add connection**, selects a

@@ -2,7 +2,6 @@
 import assert from "node:assert/strict";
 import { appendFile } from "node:fs/promises";
 const originalFetch = globalThis.fetch;
-let setups = 0;
 globalThis.fetch = async (input, init) => {
   const url = new URL(input instanceof Request ? input.url : String(input));
   if (url.hostname !== "backend.composio.dev")
@@ -27,9 +26,10 @@ globalThis.fetch = async (input, init) => {
       { status: 401 },
     );
   if (path === "/api/v3.1/connected_accounts/link") {
-    assert.equal(body.auth_config_id, "ac_native");
+    assert.ok(["ac_native", "ac_posthog"].includes(body.auth_config_id));
     return Response.json({
-      connected_account_id: ++setups === 1 ? "ca_native" : "ca_cancel",
+      connected_account_id:
+        body.auth_config_id === "ac_posthog" ? "ca_cancel" : "ca_native",
       redirect_url: "https://connect.composio.dev/synthetic",
       expires_at: new Date(Date.now() + 3600000).toISOString(),
     });
@@ -45,11 +45,12 @@ globalThis.fetch = async (input, init) => {
         revoke_job_id: "synthetic-revoke-job",
       });
     }
+    const isPostHog = path.endsWith("/ca_cancel");
     return Response.json({
       id: path.split("/").at(-1),
       user_id: "native-test-owner",
-      toolkit: { slug: "github" },
-      auth_config: { id: "ac_native" },
+      toolkit: { slug: isPostHog ? "posthog" : "github" },
+      auth_config: { id: isPostHog ? "ac_posthog" : "ac_native" },
       status: "ACTIVE",
     });
   }
