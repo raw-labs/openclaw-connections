@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/raw-labs/openclaw-connections/compare/v0.2.4...v0.3.0) (2026-11-19)
+
+
+### Features
+
+* add PostHog support ([#21](https://github.com/raw-labs/openclaw-connections/issues/21)) ([fbdfdc2](https://github.com/raw-labs/openclaw-connections/commit/fbdfdc24cf5587e796b077b549f5327ac89ee3ab))
+
 ## [0.2.4](https://github.com/raw-labs/openclaw-connections/compare/v0.2.3...v0.2.4) (2026-11-06)
 
 
